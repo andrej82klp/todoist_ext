@@ -12,6 +12,15 @@ The repository now includes:
 - Server and shared directory skeleton for the modular monolith architecture
 - Documented environment variables for future Todoist, session, and database work
 
+## Milestone 2 Status
+
+The repository now also includes:
+
+- Drizzle ORM and migration tooling wired to `DATABASE_URL`
+- Typed Postgres schema for users, Todoist mappings, metadata, settings, rewards, ledger, streaks, notifications, and webhook deliveries
+- Repository helpers for users, settings defaults, rewards, and ledger records
+- Seed and smoke-test scripts for the initial database slice
+
 ## Setup
 
 Install dependencies:
@@ -32,11 +41,24 @@ Start the development server:
 pnpm dev
 ```
 
+Apply the database migration:
+
+```bash
+pnpm db:migrate
+```
+
+Seed a development user with default settings and milestone rows:
+
+```bash
+pnpm db:seed
+```
+
 Run checks:
 
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm db:smoke
 ```
 
 ## Environment Variables
@@ -49,6 +71,8 @@ The following variables are reserved for the next milestones:
 - `TODOIST_REDIRECT_URI`
 - `TODOIST_WEBHOOK_SECRET`
 - `SESSION_SECRET`
+
+`DATABASE_URL` should point to a Neon or local Postgres instance before running `pnpm db:migrate`, `pnpm db:seed`, or `pnpm db:smoke`.
 
 See `.env.example` for placeholders and descriptions.
 
@@ -84,4 +108,4 @@ This first implementation slice does not yet include:
 - API business logic
 - points or rewards logic
 
-Those land in the next milestones after the scaffold is validated.
+Milestone 2 adds the database foundation only. Todoist integration, session auth, scoring logic, and business APIs still land in later milestones.

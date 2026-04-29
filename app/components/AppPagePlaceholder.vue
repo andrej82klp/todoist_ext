@@ -58,7 +58,10 @@ defineProps<{
         <template #header>
           <div class="flex items-center gap-3">
             <div class="rounded-xl bg-secondary/70 p-2 text-highlighted ring-1 ring-default/80">
-              <UIcon name="i-lucide-flag" class="size-5" />
+              <UIcon
+                name="i-lucide-flag"
+                class="size-5"
+              />
             </div>
             <div>
               <p class="text-sm font-semibold text-highlighted">

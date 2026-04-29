@@ -15,12 +15,12 @@ export default defineNuxtConfig({
     '/': { prerender: true }
   },
 
+  compatibilityDate: '2025-01-15',
+
   typescript: {
     strict: true,
     typeCheck: false
   },
-
-  compatibilityDate: '2025-01-15',
 
   eslint: {
     config: {
