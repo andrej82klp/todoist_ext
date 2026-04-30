@@ -19,3 +19,11 @@ export const taskMetadataUpdateSchema = taskMetadataSchema.partial().refine(
     path: ['_root']
   }
 )
+
+export const batchMetadataUpdateItemSchema = taskMetadataSchema.extend({
+  taskId: z.string().uuid()
+})
+
+export const batchMetadataUpdateSchema = z.object({
+  items: z.array(batchMetadataUpdateItemSchema).min(1).max(50)
+}).strict()

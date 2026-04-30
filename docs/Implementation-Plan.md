@@ -32,7 +32,7 @@ Partially verified / still open:
      - rerunning sync is idempotent.
      - session reports sync readiness.
 
-3. [ ] Milestone 7 — Task list API and task metadata API
+3. [x] Milestone 7 — Task list API and task metadata API
    - Implement `GET /api/tasks`.
    - Implement `GET /api/tasks/:taskId`.
    - Implement `PATCH /api/tasks/:taskId/metadata`.
@@ -185,6 +185,25 @@ Verified during this review:
 Needs follow-up:
 - Continue with Milestone 7 — Task list API and task metadata API.
 
+## Milestone 7 Completion Notes
+
+Completed on 2026-04-30:
+- `shared/schemas/tasks.ts` — added `batchMetadataUpdateItemSchema` and `batchMetadataUpdateSchema`.
+- `shared/schemas/common.ts` — fixed `includeCompleted` to use `.optional().default(false)` outside `z.preprocess` for Zod v4 compatibility.
+- `shared/types/domain.ts` — added `TaskSubtaskSummary`, `EnrichedTask`, `EnrichedTaskDetail` types.
+- `server/repositories/tasks.ts` — queries tasks + metadata (LEFT JOIN), subtask counts, project names, and upserts metadata.
+- `server/services/tasks/pointsCalculator.ts` — `calculateEstimatedPoints`, `isDeadlineApproaching`, `getDefaultPointsSettings`, `settingsToPointsSettings`.
+- `server/services/tasks/taskAssemblyService.ts` — assembles enriched task list and detail from raw rows + settings.
+- `server/api/tasks/index.get.ts` — `GET /api/tasks` with sorting (priority, difficulty, estimatedPoints, deadline), filtering (projectId, includeCompleted), and pagination.
+- `server/api/tasks/[taskId]/index.get.ts` — `GET /api/tasks/:taskId` with subtasks.
+- `server/api/tasks/[taskId]/metadata.patch.ts` — `PATCH /api/tasks/:taskId/metadata`.
+- `server/api/tasks/metadata/batch.patch.ts` — `PATCH /api/tasks/metadata/batch`.
+- `tests/server/milestone-7-tasks.test.ts` — 17 tests all passing.
+- Browser verified: 8 tasks returned for logged-in user, task detail with 2 subtasks, metadata PATCH working.
+
+Needs follow-up:
+- Continue with Milestone 8 — Settings API and settings page.
+
 ## Milestone 6 Completion Notes
 
 Completed on 2026-04-30:
@@ -199,4 +218,4 @@ Completed on 2026-04-30:
 
 ## Metadata
 
-- Updated: 2026-04-30 (Milestone 6 complete)
+- Updated: 2026-04-30 (Milestones 6 and 7 complete)

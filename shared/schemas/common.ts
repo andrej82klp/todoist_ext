@@ -61,7 +61,7 @@ export const taskListQuerySchema = paginationQuerySchema.extend({
   sortBy: taskSortBySchema.optional(),
   sortOrder: sortOrderSchema.optional(),
   projectId: z.string().trim().min(1).optional(),
-  includeCompleted: z.preprocess(stringToBoolean, z.boolean().default(false))
+  includeCompleted: z.preprocess(stringToBoolean, z.boolean().optional()).default(false)
 }).strict()
 
 export const nullableIntegerSchema = z.preprocess(

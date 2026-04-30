@@ -75,3 +75,33 @@ export interface AuthSessionState {
   user: SessionUser | null
   initialSyncCompleted: boolean
 }
+
+export interface TaskSubtaskSummary {
+  id: string
+  todoistTaskId: string
+  title: string
+  isCompleted: boolean
+  earnedPoints: number | null
+}
+
+export interface EnrichedTask {
+  id: string
+  todoistTaskId: string
+  projectId: string | null
+  projectName: string | null
+  title: string
+  deadline: string | null
+  hasSubtasks: boolean
+  subtaskCount: number
+  completedSubtaskCount: number
+  progressPercent: number | null
+  eligibleForProgressTracking: boolean
+  metadata: TodoistTaskMetadata
+  estimatedPoints: number
+  isCompleted: boolean
+  isDeadlineApproaching: boolean
+}
+
+export interface EnrichedTaskDetail extends EnrichedTask {
+  subtasks: TaskSubtaskSummary[]
+}
