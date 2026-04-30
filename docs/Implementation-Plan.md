@@ -17,6 +17,7 @@ Completed and verified:
 - Milestone 5 — Todoist OAuth login and profile fetch
 - Milestones 6–8 — Initial Todoist sync, task list/metadata API, and settings API + page (all `[x]` in the checklist below).
 - Milestone 9 — Points engine and ledger foundation
+- Milestone 10 — Reward catalog API and reward shop page
 
 Partially verified / still open:
 - None.
@@ -71,7 +72,7 @@ Partially verified / still open:
      - balance updates transactionally.
      - manual adjustments validate correctly.
 
-6. [ ] Milestone 10 — Reward catalog API and reward shop page
+6. [x] Milestone 10 — Reward catalog API and reward shop page
    - Implement rewards CRUD endpoints and redemptions history endpoint.
    - Build the reward shop page.
    - Return affordability and missing-point information from the API.

@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
-import { nullableTrimmedStringSchema } from './common'
+import {
+  nullableTrimmedStringSchema,
+  paginationQuerySchema,
+  stringToBoolean
+} from './common'
 
 export const rewardCreateSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -9,10 +13,20 @@ export const rewardCreateSchema = z.object({
   costPoints: z.coerce.number().int().positive()
 }).strict()
 
-export const rewardUpdateSchema = rewardCreateSchema.partial().refine(
+export const rewardUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(255).optional(),
+  description: nullableTrimmedStringSchema.optional(),
+  category: nullableTrimmedStringSchema.optional(),
+  costPoints: z.coerce.number().int().positive().optional(),
+  isArchived: z.boolean().optional()
+}).strict().refine(
   payload => Object.keys(payload).length > 0,
   {
     message: 'At least one reward field must be provided',
     path: ['_root']
   }
 )
+
+export const rewardsListQuerySchema = paginationQuerySchema.extend({
+  includeArchived: z.preprocess(stringToBoolean, z.boolean().optional()).default(false)
+}).strict()

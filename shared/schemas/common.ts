@@ -26,7 +26,7 @@ const stringToNullableTrimmed = (value: unknown) => {
   return trimmedValue.length === 0 ? null : trimmedValue
 }
 
-const stringToBoolean = (value: unknown) => {
+export const stringToBoolean = (value: unknown) => {
   if (typeof value === 'boolean') {
     return value
   }

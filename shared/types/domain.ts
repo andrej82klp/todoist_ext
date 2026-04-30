@@ -23,6 +23,14 @@ export interface Reward {
   updatedAt: string
 }
 
+export interface RedemptionRecord {
+  id: string
+  rewardId: string
+  rewardName: string
+  costPoints: number
+  redeemedAt: string
+}
+
 export interface PointsSummary {
   currentBalance: number
   lifetimeEarned: number
