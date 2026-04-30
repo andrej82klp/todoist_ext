@@ -20,9 +20,11 @@
     "@nuxt/ui": "^4.7.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
+    "h3": "2.0.1-rc.21",
     "nuxt": "^4.4.2",
     "postgres": "^3.4.9",
-    "tailwindcss": "^4.2.4"
+    "tailwindcss": "^4.2.4",
+    "zod": "^4.4.1"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.15.2",
