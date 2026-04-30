@@ -1,19 +1,17 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
-import { createApp } from 'h3'
-import { toNodeHandler } from 'h3/node'
+import { createApp, toNodeListener } from 'h3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { API_ERROR_STATUS } from '../../shared/constants/api'
+import { API_ERROR_STATUS,
+  API_ERROR_MESSAGE,
+  TASK_SORT_FIELDS
+} from '../../shared/constants/api'
 import actionHandler from '../../server/api/internal/test-contract/action.post'
 import collectionHandler from '../../server/api/internal/test-contract/collection.get'
 import successHandler from '../../server/api/internal/test-contract/success.get'
 import validationHandler from '../../server/api/internal/test-contract/validation.post'
-import {
-  API_ERROR_MESSAGE,
-  TASK_SORT_FIELDS
-} from '../../shared/constants/api'
 import {
   badRequestError,
   conflictError,
@@ -34,7 +32,7 @@ beforeAll(async () => {
   app.use('/api/internal/test-contract/action', actionHandler)
   app.use('/api/internal/test-contract/validation', validationHandler)
 
-  server = createServer(toNodeHandler(app))
+  server = createServer(toNodeListener(app))
 
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve())
@@ -46,7 +44,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((resolve, reject) => {
-    server.close(error => error ? reject(error) : resolve())
+    server.close((error: unknown) => error ? reject(error) : resolve())
   })
 })
 

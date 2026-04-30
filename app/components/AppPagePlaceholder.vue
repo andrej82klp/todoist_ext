@@ -68,16 +68,16 @@ defineProps<{
                 Next implementation target
               </p>
               <p class="text-sm text-toned">
-                Session, auth, and initial Todoist sync foundations.
+                Todoist OAuth and initial sync foundations.
               </p>
             </div>
           </div>
         </template>
 
         <ul class="space-y-3 text-sm leading-6 text-toned">
-          <li>Wire the first server endpoints and shared response contracts.</li>
-          <li>Add environment-backed runtime configuration.</li>
-          <li>Replace placeholder cards with live dashboard, task, reward, and settings state.</li>
+          <li>App session resolution and logout are now wired through the shell.</li>
+          <li>Todoist OAuth start and callback endpoints land in the next milestone.</li>
+          <li>Placeholder pages switch to live data after sync and feature APIs arrive.</li>
         </ul>
       </UCard>
     </section>

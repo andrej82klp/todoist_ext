@@ -1,12 +1,12 @@
-export type ApiErrorCode =
-  | 'BAD_REQUEST'
-  | 'UNAUTHORIZED'
-  | 'FORBIDDEN'
-  | 'NOT_FOUND'
-  | 'CONFLICT'
-  | 'VALIDATION_ERROR'
-  | 'INTERNAL_SERVER_ERROR'
-  | (string & {})
+export type ApiErrorCode
+  = | 'BAD_REQUEST'
+    | 'UNAUTHORIZED'
+    | 'FORBIDDEN'
+    | 'NOT_FOUND'
+    | 'CONFLICT'
+    | 'VALIDATION_ERROR'
+    | 'INTERNAL_SERVER_ERROR'
+    | (string & {})
 
 export interface CollectionMeta {
   page: number

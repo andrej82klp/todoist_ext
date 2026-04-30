@@ -11,6 +11,10 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  runtimeConfig: {
+    sessionSecret: process.env.SESSION_SECRET
+  },
+
   routeRules: {
     '/': { prerender: true }
   },

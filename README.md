@@ -21,6 +21,25 @@ The repository now also includes:
 - Repository helpers for users, settings defaults, rewards, and ledger records
 - Seed and smoke-test scripts for the initial database slice
 
+## Milestone 3 Status
+
+The repository now also includes:
+
+- Shared DTOs, enums, response envelopes, and error contracts under `shared/`
+- Zod validation schemas for task metadata, rewards, settings, ledger adjustments, and pagination/sorting inputs
+- Reusable server response and validation helpers
+- Contract tests for success, collection, action, and `422` validation responses
+
+## Milestone 4 Status
+
+The repository now also includes:
+
+- Encrypted app-session cookie utilities and current-user resolution helpers
+- `GET /api/auth/session` and `POST /api/auth/logout`
+- A dev/test-only session simulation route for local auth-state verification
+- Layout-level authenticated and unauthenticated shell states with a Todoist connect placeholder
+- Focused session tests covering unauthenticated, protected, authenticated, and logout flows
+
 ## Setup
 
 Install dependencies:

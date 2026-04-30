@@ -64,31 +64,31 @@ export function apiError(code: ApiErrorCode, message: string, details?: ApiError
     : { error: { code, message, details } }
 }
 
-export function badRequestError(message = API_ERROR_MESSAGE.BAD_REQUEST, details?: ApiErrorDetails) {
+export function badRequestError(message: string = API_ERROR_MESSAGE.BAD_REQUEST, details?: ApiErrorDetails) {
   return new ApiHttpError(API_ERROR_STATUS.BAD_REQUEST, 'BAD_REQUEST', message, details)
 }
 
-export function unauthorizedError(message = API_ERROR_MESSAGE.UNAUTHORIZED, details?: ApiErrorDetails) {
+export function unauthorizedError(message: string = API_ERROR_MESSAGE.UNAUTHORIZED, details?: ApiErrorDetails) {
   return new ApiHttpError(API_ERROR_STATUS.UNAUTHORIZED, 'UNAUTHORIZED', message, details)
 }
 
-export function forbiddenError(message = API_ERROR_MESSAGE.FORBIDDEN, details?: ApiErrorDetails) {
+export function forbiddenError(message: string = API_ERROR_MESSAGE.FORBIDDEN, details?: ApiErrorDetails) {
   return new ApiHttpError(API_ERROR_STATUS.FORBIDDEN, 'FORBIDDEN', message, details)
 }
 
-export function notFoundError(message = API_ERROR_MESSAGE.NOT_FOUND, details?: ApiErrorDetails) {
+export function notFoundError(message: string = API_ERROR_MESSAGE.NOT_FOUND, details?: ApiErrorDetails) {
   return new ApiHttpError(API_ERROR_STATUS.NOT_FOUND, 'NOT_FOUND', message, details)
 }
 
-export function conflictError(message = API_ERROR_MESSAGE.CONFLICT, details?: ApiErrorDetails) {
+export function conflictError(message: string = API_ERROR_MESSAGE.CONFLICT, details?: ApiErrorDetails) {
   return new ApiHttpError(API_ERROR_STATUS.CONFLICT, 'CONFLICT', message, details)
 }
 
-export function validationError(details: ValidationErrorDetails, message = API_ERROR_MESSAGE.VALIDATION_ERROR) {
+export function validationError(details: ValidationErrorDetails, message: string = API_ERROR_MESSAGE.VALIDATION_ERROR) {
   return new ApiHttpError(API_ERROR_STATUS.VALIDATION_ERROR, 'VALIDATION_ERROR', message, details)
 }
 
-export function internalServerError(message = API_ERROR_MESSAGE.INTERNAL_SERVER_ERROR, details?: ApiErrorDetails) {
+export function internalServerError(message: string = API_ERROR_MESSAGE.INTERNAL_SERVER_ERROR, details?: ApiErrorDetails) {
   return new ApiHttpError(API_ERROR_STATUS.INTERNAL_SERVER_ERROR, 'INTERNAL_SERVER_ERROR', message, details)
 }
 
@@ -139,11 +139,10 @@ export function normalizeApiError(error: unknown): ApiHttpError {
 }
 
 export function defineApiHandler<T>(handler: ApiHandler<T>): EventHandler {
-  return defineEventHandler(async event => {
+  return defineEventHandler(async (event) => {
     try {
       return await handler(event)
-    }
-    catch (error) {
+    } catch (error) {
       const normalizedError = normalizeApiError(error)
       setResponseStatus(event, normalizedError.statusCode)
 
