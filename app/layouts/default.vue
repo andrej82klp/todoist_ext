@@ -113,7 +113,8 @@ async function logout() {
             color="primary"
             variant="soft"
             class="font-medium"
-            disabled
+            href="/api/auth/todoist/start"
+            external
           >
             Connect Todoist
           </UButton>
@@ -192,7 +193,8 @@ async function logout() {
               variant="soft"
               size="sm"
               class="mt-3"
-              disabled
+              href="/api/auth/todoist/start"
+              external
             >
               Connect Todoist
             </UButton>
