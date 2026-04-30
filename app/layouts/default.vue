@@ -31,7 +31,7 @@ async function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_35%),linear-gradient(180deg,_#f4f1e8_0%,_#fffdf8_48%,_#f5f8ef_100%)] text-highlighted">
+  <div class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_35%),linear-gradient(180deg,_#f4f1e8_0%,_#fffdf8_48%,_#f5f8ef_100%)] text-highlighted dark:bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.14),_transparent_38%),linear-gradient(180deg,_#0c1210_0%,_#0f1714_48%,_#0a100e_100%)]">
     <UHeader
       toggle-side="right"
       class="border-b border-default/60 bg-background/80 backdrop-blur"
