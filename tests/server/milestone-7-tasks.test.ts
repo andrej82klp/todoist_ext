@@ -14,7 +14,7 @@ import batchMetadataPatchHandler from '../../server/api/tasks/metadata/batch.pat
 import sessionPostHandler from '../../server/api/internal/test-auth/session.post'
 import { closeDbConnection, getDb } from '../../server/db/client'
 import { ensureUserDefaults } from '../../server/db/defaults'
-import { taskMetadata, todoistItemMappings, users } from '../../server/db/schema'
+import { taskMetadata, users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 import { itemMappingsRepository } from '../../server/repositories/item-mappings'
 import {
@@ -22,6 +22,7 @@ import {
   getDefaultPointsSettings,
   isDeadlineApproaching
 } from '../../server/services/tasks/pointsCalculator'
+import type { EnrichedTask, TaskSubtaskSummary } from '../../shared/types'
 
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
@@ -168,7 +169,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(payload.meta.total).toBe(2)
       expect(payload.data).toHaveLength(2)
 
-      const task1 = payload.data.find((t: any) => t.todoistTaskId === 'task-1')
+      const task1 = payload.data.find((t: EnrichedTask) => t.todoistTaskId === 'task-1')
       expect(task1).toBeTruthy()
       expect(task1.projectName).toBe('Work')
       expect(task1.hasSubtasks).toBe(true)
@@ -181,7 +182,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(task1.estimatedPoints).toBe(13)
       expect(task1.isCompleted).toBe(false)
 
-      const task2 = payload.data.find((t: any) => t.todoistTaskId === 'task-2')
+      const task2 = payload.data.find((t: EnrichedTask) => t.todoistTaskId === 'task-2')
       expect(task2.hasSubtasks).toBe(false)
       expect(task2.progressPercent).toBeNull()
       expect(task2.eligibleForProgressTracking).toBe(false)
@@ -346,7 +347,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(payload.data.completedSubtaskCount).toBe(1)
       expect(payload.data.progressPercent).toBe(50)
 
-      const subA = payload.data.subtasks.find((s: any) => s.todoistTaskId === 'sub-a')
+      const subA = payload.data.subtasks.find((s: TaskSubtaskSummary) => s.todoistTaskId === 'sub-a')
       expect(subA.isCompleted).toBe(true)
       expect(subA.earnedPoints).toBeNull()
     } finally {
@@ -525,7 +526,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(batchRes.status).toBe(200)
       expect(batchPayload.data.updated).toBe(2)
       expect(batchPayload.data.items).toHaveLength(2)
-      expect(batchPayload.data.items.every((i: any) => i.success)).toBe(true)
+      expect(batchPayload.data.items.every((i: { success: boolean }) => i.success)).toBe(true)
     } finally {
       await db.delete(users).where(eq(users.id, user.id))
     }

@@ -1,7 +1,6 @@
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
-import type { AddressInfo } from 'node:net'
 
 import { eq } from 'drizzle-orm'
 import { createApp, toNodeListener } from 'h3'
@@ -19,7 +18,6 @@ import { todoistSyncService } from '../../server/services/todoist/todoistSyncSer
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
-let baseUrl = ''
 
 const MOCK_PROJECTS = [
   { id: 'proj-1', name: 'Inbox', parent_id: null },
@@ -120,9 +118,6 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve())
   })
-
-  const address = server.address() as AddressInfo
-  baseUrl = `http://127.0.0.1:${address.port}`
 })
 
 afterAll(async () => {

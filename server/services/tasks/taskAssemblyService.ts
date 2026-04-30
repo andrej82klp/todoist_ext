@@ -82,10 +82,9 @@ export const taskAssemblyService = {
   },
 
   async buildEnrichedTaskDetail(userId: string, row: TaskWithMetaRow): Promise<EnrichedTaskDetail> {
-    const [enrichedList, subtaskRows, settings] = await Promise.all([
+    const [enrichedList, subtaskRows] = await Promise.all([
       this.buildEnrichedTaskList(userId, [row]),
-      tasksRepository.getSubtasksForTask(userId, row.todoistItemId),
-      settingsRepository.findByUserId(userId)
+      tasksRepository.getSubtasksForTask(userId, row.todoistItemId)
     ])
 
     const enriched = enrichedList[0]!
