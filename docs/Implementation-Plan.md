@@ -14,13 +14,14 @@ Completed and verified:
 - Milestone 2 — Database foundation and migrations
 - Milestone 3 — Shared types, API envelopes, and validation layer
 - Milestone 4 — Session foundation and auth state endpoint
+- Milestone 5 — Todoist OAuth login and profile fetch
 
 Partially verified / still open:
-- Milestone 5 — Todoist OAuth login appears implemented in code, but verification is not fully closed because the current OAuth test suite fails against the profile-fetch path it expects.
+- None.
 
 ## Carryover From Milestone 5
 
-1. [ ] Milestone 5 — Close OAuth verification and align implementation/tests
+1. [x] Milestone 5 — Close OAuth verification and align implementation/tests
    - Goal: fully verify Todoist OAuth login before treating it as complete.
    - Verified in code:
      - `GET /api/auth/todoist/start` exists and issues OAuth state.
@@ -29,9 +30,9 @@ Partially verified / still open:
      - the app session cookie is created after successful callback.
      - the browser does not receive the Todoist access token.
    - Remaining work:
-     - resolve the mismatch between the OAuth implementation and the current milestone-5 tests around the Todoist profile endpoint path.
-     - rerun `tests/server/milestone-5-oauth.test.ts` until it passes cleanly.
-     - confirm the callback success path still returns the expected redirect/session behavior after the test alignment.
+     - Completed on 2026-04-30: OAuth endpoints were aligned to Todoist's documented authorization, token exchange, and current-user profile endpoints.
+     - Completed on 2026-04-30: `tests/server/milestone-5-oauth.test.ts` passes cleanly.
+     - Completed on 2026-04-30: browser OAuth verification confirms the callback creates an authenticated app session and fetches the Todoist profile.
    - Acceptance:
      - `/api/auth/todoist/start` redirects correctly.
      - `/api/auth/todoist/callback` validates state and creates a session.
@@ -198,9 +199,11 @@ Verified during this review:
 - `pnpm db:smoke` passed.
 - `tests/server/milestone-3-contracts.test.ts` passed.
 - `tests/server/milestone-4-session.test.ts` passed.
+- `tests/server/milestone-5-oauth.test.ts` passed.
+- Browser OAuth login verified against Todoist; `/api/auth/session` returned the authenticated Todoist profile without error.
 
 Needs follow-up:
-- `tests/server/milestone-5-oauth.test.ts` currently fails because the test expectations do not match the current Todoist profile-fetch path used by the implementation.
+- Continue with Milestone 6 — Initial Todoist sync and local mapping.
 
 ## Metadata
 

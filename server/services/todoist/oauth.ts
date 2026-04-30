@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { API_ERROR_MESSAGE } from '../../../shared/constants/api'
 import { badRequestError, internalServerError } from '../../utils/api'
 
-const TODOIST_AUTHORIZE_URL = 'https://todoist.com/oauth/authorize'
-const TODOIST_TOKEN_URL = 'https://todoist.com/oauth/access_token'
+const TODOIST_AUTHORIZE_URL = 'https://app.todoist.com/oauth/authorize'
+const TODOIST_TOKEN_URL = 'https://api.todoist.com/oauth/access_token'
 const TODOIST_USER_URL = 'https://api.todoist.com/api/v1/user'
 const TODOIST_LEGACY_USER_URL = 'https://api.todoist.com/sync/v9/user'
 
@@ -52,17 +52,19 @@ export function buildTodoistAuthorizeUrl(state: string) {
 }
 
 export async function exchangeTodoistAuthorizationCode(code: string) {
+  const body = new URLSearchParams({
+    client_id: getEnvValue('TODOIST_CLIENT_ID'),
+    client_secret: getEnvValue('TODOIST_CLIENT_SECRET'),
+    code,
+    redirect_uri: getRedirectUri()
+  })
+
   const response = await fetch(TODOIST_TOKEN_URL, {
     method: 'POST',
     headers: {
-      'content-type': 'application/json'
+      'content-type': 'application/x-www-form-urlencoded'
     },
-    body: JSON.stringify({
-      client_id: getEnvValue('TODOIST_CLIENT_ID'),
-      client_secret: getEnvValue('TODOIST_CLIENT_SECRET'),
-      code,
-      redirect_uri: getRedirectUri()
-    })
+    body
   })
 
   if (!response.ok) {

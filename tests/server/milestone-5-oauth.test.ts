@@ -73,8 +73,13 @@ describe('Milestone 5 Todoist OAuth flow', () => {
           ? input.toString()
           : input.url
 
-      if (url === 'https://todoist.com/oauth/access_token') {
+      if (url === 'https://api.todoist.com/oauth/access_token') {
         expect(init?.method).toBe('POST')
+        expect(init?.headers).toMatchObject({
+          'content-type': 'application/x-www-form-urlencoded'
+        })
+        expect(init?.body).toBeInstanceOf(URLSearchParams)
+        expect((init?.body as URLSearchParams).get('code')).toBe('test-auth-code')
 
         return new Response(JSON.stringify({
           access_token: 'todoist-access-token',
@@ -86,7 +91,7 @@ describe('Milestone 5 Todoist OAuth flow', () => {
         })
       }
 
-      if (url === 'https://api.todoist.com/sync/v9/user') {
+      if (url === 'https://api.todoist.com/api/v1/user') {
         return new Response(JSON.stringify({
           id: 'todoist-user-123',
           email: 'oauth-user@example.com',
@@ -111,7 +116,7 @@ describe('Milestone 5 Todoist OAuth flow', () => {
 
       const startLocation = startResponse.headers.get('location')
       expect(startLocation).toBeTruthy()
-      expect(startLocation).toContain('https://todoist.com/oauth/authorize')
+      expect(startLocation).toContain('https://app.todoist.com/oauth/authorize')
 
       const startCookie = startResponse.headers.get('set-cookie')
       expect(startCookie).toContain('todoist_oauth_state=')
@@ -191,7 +196,7 @@ describe('Milestone 5 fetchTodoistUserProfile service', () => {
           ? input.toString()
           : input.url
 
-      expect(url).toBe('https://api.todoist.com/sync/v9/user')
+      expect(url).toBe('https://api.todoist.com/api/v1/user')
       expect(init?.headers).toMatchObject({
         authorization: 'Bearer profile-test-token'
       })
