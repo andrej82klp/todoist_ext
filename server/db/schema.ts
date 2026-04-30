@@ -286,5 +286,6 @@ export const dashboardNotifications = pgTable('dashboard_notifications', {
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type GlobalSettings = typeof globalSettings.$inferSelect
+export type NewGlobalSettings = typeof globalSettings.$inferInsert
 export type Reward = typeof rewards.$inferSelect
 export type PointLedgerTransaction = typeof pointLedger.$inferSelect

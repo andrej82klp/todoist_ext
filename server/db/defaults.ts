@@ -16,14 +16,18 @@ export async function ensureUserDefaults(userId: string) {
   await db.insert(pointBalances).values({ userId }).onConflictDoNothing()
   await db.insert(streakState).values({ userId }).onConflictDoNothing()
   await db.insert(streakProtection).values({ userId, balance: 3 }).onConflictDoNothing()
-  await db.insert(milestoneDefinitions).values(
-    DEFAULT_MILESTONES.map(milestone => ({
-      userId,
-      days: milestone.days,
-      fixedBonusPoints: milestone.fixedBonusPoints,
-      percentageBonus: milestone.percentageBonus
-    }))
-  ).onConflictDoNothing()
+
+  const existingMilestones = await db.select().from(milestoneDefinitions).where(eq(milestoneDefinitions.userId, userId))
+  if (existingMilestones.length === 0) {
+    await db.insert(milestoneDefinitions).values(
+      DEFAULT_MILESTONES.map(milestone => ({
+        userId,
+        days: milestone.days,
+        fixedBonusPoints: milestone.fixedBonusPoints,
+        percentageBonus: milestone.percentageBonus
+      }))
+    ).onConflictDoNothing()
+  }
 
   const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.userId, userId)).limit(1)
   const milestones = await db.select().from(milestoneDefinitions).where(eq(milestoneDefinitions.userId, userId))

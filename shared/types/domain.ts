@@ -105,3 +105,38 @@ export interface EnrichedTask {
 export interface EnrichedTaskDetail extends EnrichedTask {
   subtasks: TaskSubtaskSummary[]
 }
+
+export interface SettingsMilestoneDefinition {
+  days: number
+  fixedBonusPoints: number
+  percentageBonus: number
+  isActive: boolean
+}
+
+export interface GlobalSettingsPoints {
+  difficultyMultiplierBase: number
+  priorityMultipliers: {
+    low: number
+    medium: number
+    high: number
+  }
+  defaultCompletionBonusEnabled: boolean
+  defaultCompletionBonusPercent: number
+}
+
+export interface GlobalSettingsStreak {
+  ruleType: StreakRuleType
+  ruleValue: number
+  protectionEnabled: boolean
+  startingProtectionBalance: number
+  protectionRewardEveryNDays: number
+  protectionRewardAmount: number
+  bonusStrategy: StreakBonusStrategy
+  milestonePercentageWindowDays: number
+  milestones: SettingsMilestoneDefinition[]
+}
+
+export interface GlobalSettingsResponse {
+  points: GlobalSettingsPoints
+  streak: GlobalSettingsStreak
+}

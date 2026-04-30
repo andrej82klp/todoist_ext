@@ -4,6 +4,13 @@ import { ensureUserDefaults } from '../db/defaults'
 import { getDb } from '../db/client'
 import { globalSettings, milestoneDefinitions, pointBalances, streakProtection, streakState } from '../db/schema'
 
+export type MilestoneReplaceRow = {
+  days: number
+  fixedBonusPoints: number
+  percentageBonus: string
+  isActive: boolean
+}
+
 export const settingsRepository = {
   async ensureDefaults(userId: string) {
     return ensureUserDefaults(userId)
@@ -41,5 +48,33 @@ export const settingsRepository = {
     const [protection] = await db.select().from(streakProtection).where(eq(streakProtection.userId, userId)).limit(1)
 
     return protection ?? null
+  },
+
+  async updateGlobalSettings(userId: string, updates: Partial<typeof globalSettings.$inferInsert>) {
+    const db = getDb()
+    await db.update(globalSettings)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(globalSettings.userId, userId))
+  },
+
+  async replaceMilestones(userId: string, milestones: MilestoneReplaceRow[]) {
+    const db = getDb()
+    await db.transaction(async (tx) => {
+      await tx.delete(milestoneDefinitions).where(eq(milestoneDefinitions.userId, userId))
+      if (milestones.length > 0) {
+        await tx.insert(milestoneDefinitions).values(
+          milestones.map(m => ({
+            userId,
+            days: m.days,
+            fixedBonusPoints: m.fixedBonusPoints,
+            percentageBonus: m.percentageBonus,
+            isActive: m.isActive
+          }))
+        )
+      }
+    })
   }
 }
