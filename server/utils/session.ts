@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 import type { AuthSessionState, SessionUser } from '../../shared/types'
 import type { User } from '../db/schema'
+import { itemMappingsRepository } from '../repositories/item-mappings'
 import { usersRepository } from '../repositories/users'
 import { internalServerError, unauthorizedError } from './api'
 
@@ -204,9 +205,11 @@ export async function buildAuthSessionState(event: H3Event): Promise<AuthSession
     return createUnauthenticatedSessionState()
   }
 
+  const syncedCount = await itemMappingsRepository.countByUserId(user.id)
+
   return {
     authenticated: true,
     user: toSessionUser(user),
-    initialSyncCompleted: false
+    initialSyncCompleted: syncedCount > 0
   }
 }

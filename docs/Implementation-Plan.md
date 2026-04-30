@@ -19,29 +19,9 @@ Completed and verified:
 Partially verified / still open:
 - None.
 
-## Carryover From Milestone 5
-
-1. [x] Milestone 5 — Close OAuth verification and align implementation/tests
-   - Goal: fully verify Todoist OAuth login before treating it as complete.
-   - Verified in code:
-     - `GET /api/auth/todoist/start` exists and issues OAuth state.
-     - `GET /api/auth/todoist/callback` exists and validates state.
-     - tokens are stored server-side in `oauth_accounts`.
-     - the app session cookie is created after successful callback.
-     - the browser does not receive the Todoist access token.
-   - Remaining work:
-     - Completed on 2026-04-30: OAuth endpoints were aligned to Todoist's documented authorization, token exchange, and current-user profile endpoints.
-     - Completed on 2026-04-30: `tests/server/milestone-5-oauth.test.ts` passes cleanly.
-     - Completed on 2026-04-30: browser OAuth verification confirms the callback creates an authenticated app session and fetches the Todoist profile.
-   - Acceptance:
-     - `/api/auth/todoist/start` redirects correctly.
-     - `/api/auth/todoist/callback` validates state and creates a session.
-     - OAuth tests pass.
-     - errors still return a structured failure response.
-
 ## Outstanding Milestones
 
-2. [ ] Milestone 6 — Initial Todoist sync and local mapping
+2. [x] Milestone 6 — Initial Todoist sync and local mapping
    - Implement Todoist read-only sync for projects, tasks, and subtasks.
    - Persist user-scoped mappings without duplicates.
    - Store the minimal cached Todoist fields required by the original plan.
@@ -203,9 +183,20 @@ Verified during this review:
 - Browser OAuth login verified against Todoist; `/api/auth/session` returned the authenticated Todoist profile without error.
 
 Needs follow-up:
-- Continue with Milestone 6 — Initial Todoist sync and local mapping.
+- Continue with Milestone 7 — Task list API and task metadata API.
+
+## Milestone 6 Completion Notes
+
+Completed on 2026-04-30:
+- `server/services/todoist/sync.ts` — Todoist API client for projects and tasks with cursor-based pagination.
+- `server/repositories/item-mappings.ts` — `itemMappingsRepository` with `upsertMany`, `countByUserId`, `findByUserId`, `findByUserIdAndType`.
+- `server/services/todoist/todoistSyncService.ts` — `todoistSyncService.runInitialSync(userId, accessToken)` orchestrates project and task fetching and persists idempotent mappings.
+- `server/api/auth/todoist/callback.get.ts` — triggers sync as background task after OAuth.
+- `server/utils/session.ts` — `buildAuthSessionState` now checks `itemMappingsRepository.countByUserId` and returns `initialSyncCompleted: true` when items exist.
+- `server/repositories/oauth-accounts.ts` — added `getDecryptedAccessToken` helper.
+- `tests/server/milestone-6-sync.test.ts` — 8 tests covering API client, pagination, idempotency, counts, and session readiness. All pass.
+- Browser verified: 22 items synced (5 projects, 8 tasks, 9 subtasks) for the test user.
 
 ## Metadata
 
-- Updated: 2026-04-30
-- Path: `/docs/Implementation-Plan.md`
+- Updated: 2026-04-30 (Milestone 6 complete)

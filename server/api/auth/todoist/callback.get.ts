@@ -5,6 +5,7 @@ import { ensureUserDefaults } from '../../../db/defaults'
 import { oauthAccountsRepository } from '../../../repositories/oauth-accounts'
 import { usersRepository } from '../../../repositories/users'
 import { exchangeTodoistAuthorizationCode, fetchTodoistUserProfile } from '../../../services/todoist/oauth'
+import { todoistSyncService } from '../../../services/todoist/todoistSyncService'
 import { badRequestError, defineApiHandler, internalServerError } from '../../../utils/api'
 import { consumeTodoistOauthState } from '../../../utils/oauth-state'
 import { setAppSession } from '../../../utils/session'
@@ -63,6 +64,10 @@ export default defineApiHandler(async (event) => {
   })
 
   setAppSession(event, user.id)
+
+  todoistSyncService.runInitialSync(user.id, token.access_token).catch((err) => {
+    console.error('Initial Todoist sync failed', { userId: user.id, error: err })
+  })
 
   return sendRedirect(event, '/', 302)
 })

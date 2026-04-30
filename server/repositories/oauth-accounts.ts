@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 
 import { getDb } from '../db/client'
 import { oauthAccounts } from '../db/schema'
-import { encryptSecret } from '../utils/secrets'
+import { decryptSecret, encryptSecret } from '../utils/secrets'
 
 export interface UpsertTodoistOauthAccountInput {
   userId: string
@@ -57,5 +57,11 @@ export const oauthAccountsRepository = {
       .limit(1)
 
     return record ?? null
+  },
+
+  async getDecryptedAccessToken(userId: string): Promise<string | null> {
+    const record = await this.findTodoistAccountByUserId(userId)
+    if (!record) return null
+    return decryptSecret(record.accessToken)
   }
 }
