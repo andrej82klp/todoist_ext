@@ -26,3 +26,4 @@ logs
 ignore
 .pnpm-store
 .claude/agents/todoist-implementation-planner.md
+.secrets/
