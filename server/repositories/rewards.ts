@@ -1,5 +1,6 @@
 import { and, count, desc, eq } from 'drizzle-orm'
 
+import type { DatabaseClient } from '../db/client'
 import { getDb } from '../db/client'
 import { rewardRedemptions, rewards } from '../db/schema'
 
@@ -27,6 +28,31 @@ export interface RewardRedemptionListRow {
   rewardName: string
   costPoints: number
   redeemedAt: Date
+}
+
+export interface RewardRedemptionRow extends RewardRedemptionListRow {
+  idempotencyKey: string | null
+}
+
+export interface CreateRewardRedemptionInput {
+  userId: string
+  rewardId: string
+  costPoints: number
+  redemptionNote?: string | null
+  idempotencyKey?: string | null
+}
+
+function redemptionDetailsSelect(db: DatabaseClient) {
+  return db.select({
+    id: rewardRedemptions.id,
+    userId: rewardRedemptions.userId,
+    rewardId: rewardRedemptions.rewardId,
+    rewardName: rewards.name,
+    costPoints: rewardRedemptions.costPoints,
+    redeemedAt: rewardRedemptions.redeemedAt,
+    idempotencyKey: rewardRedemptions.idempotencyKey
+  }).from(rewardRedemptions)
+    .innerJoin(rewards, eq(rewards.id, rewardRedemptions.rewardId))
 }
 
 export const rewardsRepository = {
@@ -118,6 +144,43 @@ export const rewardsRepository = {
     const [row] = await db.select({ c: count() }).from(rewards).where(whereClause)
 
     return row?.c ?? 0
+  },
+
+  async createRedemption(tx: DatabaseClient, input: CreateRewardRedemptionInput) {
+    const [redemption] = await tx.insert(rewardRedemptions).values({
+      userId: input.userId,
+      rewardId: input.rewardId,
+      costPoints: input.costPoints,
+      redemptionNote: input.redemptionNote ?? null,
+      idempotencyKey: input.idempotencyKey ?? null
+    }).onConflictDoNothing().returning()
+
+    return redemption ?? null
+  },
+
+  async findRedemptionById(id: string): Promise<RewardRedemptionRow | null> {
+    const db = getDb()
+    const [row] = await redemptionDetailsSelect(db)
+      .where(eq(rewardRedemptions.id, id))
+      .limit(1)
+
+    return row ?? null
+  },
+
+  async findRedemptionByUserIdAndIdempotencyKey(userId: string, idempotencyKey: string | null | undefined): Promise<RewardRedemptionRow | null> {
+    if (!idempotencyKey) {
+      return null
+    }
+
+    const db = getDb()
+    const [row] = await redemptionDetailsSelect(db)
+      .where(and(
+        eq(rewardRedemptions.userId, userId),
+        eq(rewardRedemptions.idempotencyKey, idempotencyKey)
+      ))
+      .limit(1)
+
+    return row ?? null
   },
 
   async listRedemptionsByUserId(userId: string, page: number, pageSize: number): Promise<RewardRedemptionListRow[]> {

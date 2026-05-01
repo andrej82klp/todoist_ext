@@ -118,11 +118,13 @@ export const rewardRedemptions = pgTable('reward_redemptions', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   rewardId: uuid('reward_id').notNull().references(() => rewards.id, { onDelete: 'cascade' }),
   costPoints: integer('cost_points').notNull(),
+  idempotencyKey: varchar('idempotency_key', { length: 255 }),
   redemptionNote: text('redemption_note'),
   redeemedAt: timestamp('redeemed_at', { withTimezone: true }).notNull().defaultNow(),
   ...auditColumns()
 }, table => [
   index('reward_redemptions_user_redeemed_at_idx').on(table.userId, table.redeemedAt),
+  uniqueIndex('reward_redemptions_user_idempotency_key_unique').on(table.userId, table.idempotencyKey).where(sql`${table.idempotencyKey} is not null`),
   check('reward_redemptions_cost_points_positive_check', sql`${table.costPoints} > 0`)
 ])
 

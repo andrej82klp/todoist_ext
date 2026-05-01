@@ -1,18 +1,39 @@
+import { eq } from 'drizzle-orm'
 import type { z } from 'zod'
 
 import type { rewardCreateSchema, rewardUpdateSchema } from '../../../shared/schemas/rewards'
-import type { RedemptionRecord, Reward } from '../../../shared/types'
+import type { RedemptionRecord, Reward, RewardRedemptionResult } from '../../../shared/types'
+import type { DatabaseClient } from '../../db/client'
+import { getDb } from '../../db/client'
+import { pointBalances } from '../../db/schema'
 import { ledgerRepository } from '../../repositories/ledger'
-import type { RewardRedemptionListRow } from '../../repositories/rewards'
+import type { RewardRedemptionListRow, RewardRedemptionRow } from '../../repositories/rewards'
 import { rewardsRepository } from '../../repositories/rewards'
-import { notFoundError, internalServerError } from '../../utils/api'
+import { ApiHttpError, internalServerError, notFoundError } from '../../utils/api'
 import { pointsEngineService } from '../points/pointsEngineService'
 
 type RewardCreateBody = z.infer<typeof rewardCreateSchema>
 type RewardUpdateBody = z.infer<typeof rewardUpdateSchema>
 
+function insufficientPointsError(rewardId: string, missingPoints: number) {
+  return new ApiHttpError(409, 'INSUFFICIENT_POINTS', 'Not enough points to redeem this reward', {
+    rewardId,
+    missingPoints
+  })
+}
+
 function getCurrentBalance(userId: string) {
   return ledgerRepository.getBalanceByUserId(userId).then(row => row?.currentBalance ?? 0)
+}
+
+async function getRedemptionResultFromExisting(userId: string, redemption: RewardRedemptionRow): Promise<RewardRedemptionResult> {
+  const balanceRow = await ledgerRepository.getBalanceByUserId(userId)
+
+  return {
+    success: true,
+    redemption: toRedemptionDomain(redemption),
+    points: pointsEngineService.balanceRowToSummary(balanceRow)
+  }
 }
 
 export function toRewardDomain(
@@ -166,5 +187,89 @@ export const rewardsService = {
         total
       }
     }
+  },
+
+  async redeemReward(
+    userId: string,
+    rewardId: string,
+    options?: { idempotencyKey?: string | null }
+  ): Promise<RewardRedemptionResult> {
+    const idempotencyKey = options?.idempotencyKey?.trim() || null
+    const existingRedemption = await rewardsRepository.findRedemptionByUserIdAndIdempotencyKey(userId, idempotencyKey)
+
+    if (existingRedemption) {
+      return getRedemptionResultFromExisting(userId, existingRedemption)
+    }
+
+    const reward = await rewardsRepository.findById(rewardId)
+
+    if (!reward || reward.userId !== userId || reward.isArchived) {
+      throw notFoundError('Reward not found')
+    }
+
+    const db = getDb()
+    const transactionResult = await db.transaction(async (tx) => {
+      const [balanceRow] = await tx.select().from(pointBalances).where(eq(pointBalances.userId, userId)).limit(1)
+      const currentBalance = balanceRow?.currentBalance ?? 0
+
+      if (currentBalance < reward.costPoints) {
+        throw insufficientPointsError(reward.id, reward.costPoints - currentBalance)
+      }
+
+      const redemption = await rewardsRepository.createRedemption(tx as unknown as DatabaseClient, {
+        userId,
+        rewardId: reward.id,
+        costPoints: reward.costPoints,
+        idempotencyKey
+      })
+
+      if (!redemption) {
+        return { duplicated: true as const }
+      }
+
+      const ledgerResult = await ledgerRepository.createTransactionAndUpdateBalanceInTransaction(tx as unknown as DatabaseClient, {
+        userId,
+        transactionType: 'spent',
+        amount: reward.costPoints,
+        description: `Redeemed reward: ${reward.name}`,
+        source: 'reward_redemption',
+        relatedEntityType: 'reward_redemption',
+        relatedEntityId: redemption.id,
+        idempotencyKey,
+        metadata: {
+          rewardId: reward.id,
+          rewardName: reward.name
+        }
+      })
+
+      return {
+        duplicated: false as const,
+        redemption: toRedemptionDomain({
+          id: redemption.id,
+          userId: redemption.userId,
+          rewardId: redemption.rewardId,
+          rewardName: reward.name,
+          costPoints: redemption.costPoints,
+          redeemedAt: redemption.redeemedAt
+        }),
+        points: pointsEngineService.balanceRowToSummary(ledgerResult.balance)
+      }
+    })
+
+    if (!transactionResult.duplicated) {
+      return {
+        success: true,
+        redemption: transactionResult.redemption,
+        points: transactionResult.points
+      }
+    }
+
+    const dedupedRedemption = await rewardsRepository.findRedemptionByUserIdAndIdempotencyKey(userId, idempotencyKey)
+
+    if (!dedupedRedemption) {
+      throw internalServerError('Failed to load existing redemption')
+    }
+
+    return getRedemptionResultFromExisting(userId, dedupedRedemption)
   }
 }

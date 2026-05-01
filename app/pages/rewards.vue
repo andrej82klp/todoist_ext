@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PointsSummary, RedemptionRecord, Reward } from '../../shared/types'
+import type { PointsSummary, RedemptionRecord, Reward, RewardRedemptionResult } from '../../shared/types'
 
 interface RewardsListData {
   rewards: Reward[]
@@ -32,6 +32,8 @@ const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
 const saveError = ref('')
+const redeemingId = ref<string | null>(null)
+const redeemError = ref('')
 
 const form = reactive({
   name: '',
@@ -117,9 +119,32 @@ async function archiveReward(reward: Reward) {
   }
 }
 
-// Redemption implemented in M11
-function stubRedeem() {
-  // redemption implemented in M11
+async function redeemReward(reward: Reward) {
+  if (redeemingId.value) {
+    return
+  }
+
+  redeemError.value = ''
+  redeemingId.value = reward.id
+
+  const idempotencyKey = crypto.randomUUID()
+
+  try {
+    await $fetch<{ data: RewardRedemptionResult }>(`/api/rewards/${reward.id}/redeem`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Idempotency-Key': idempotencyKey
+      }
+    })
+
+    await Promise.all([refreshList(), refreshRedemptions()])
+  } catch (e: unknown) {
+    const err = e as { data?: { error?: { message?: string } } }
+    redeemError.value = err.data?.error?.message ?? 'Could not redeem reward'
+  } finally {
+    redeemingId.value = null
+  }
 }
 </script>
 
@@ -134,7 +159,7 @@ function stubRedeem() {
           Rewards
         </h1>
         <p class="max-w-2xl text-base leading-7 text-toned">
-          Build your reward catalog, see affordability from your live balance, and track redemption history. Redeeming points is coming in the next milestone.
+          Build your reward catalog, see affordability from your live balance, redeem rewards, and track redemption history.
         </p>
       </div>
     </section>
@@ -209,6 +234,14 @@ function stubRedeem() {
         />
       </div>
     </div>
+
+    <UAlert
+      v-if="redeemError"
+      color="error"
+      variant="subtle"
+      title="Could not redeem reward"
+      :description="redeemError"
+    />
 
     <div
       v-if="listPending"
@@ -318,9 +351,10 @@ function stubRedeem() {
 
         <UButton
           class="mt-4 w-full justify-center"
-          label="Redeem"
-          :disabled="!reward.affordability?.canRedeem"
-          @click="stubRedeem"
+          :label="redeemingId === reward.id ? 'Redeeming…' : 'Redeem'"
+          :loading="redeemingId === reward.id"
+          :disabled="!reward.affordability?.canRedeem || redeemingId !== null"
+          @click="redeemReward(reward)"
         />
       </UCard>
     </div>
@@ -358,7 +392,7 @@ function stubRedeem() {
         v-else-if="redemptions.length === 0"
         class="text-sm text-toned py-4"
       >
-        No redemptions yet. When you redeem rewards (next milestone), they’ll appear here.
+        No redemptions yet. When you redeem rewards, they’ll appear here.
       </div>
 
       <div

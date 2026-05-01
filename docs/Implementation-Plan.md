@@ -82,7 +82,8 @@ Partially verified / still open:
      - reward list includes affordability.
      - UI disables redeem when affordability is false.
 
-7. [ ] Milestone 11 — Reward redemption
+7. [x] Milestone 11 — Reward redemption
+   - Detailed execution plan: [Milestone 11 reward redemption plan](../.cursor/plans/milestone_11_redemption_plan.plan.md).
    - Implement `POST /api/rewards/:rewardId/redeem`.
    - Check balance, insert redemption, create `spent` ledger transaction, and decrement balance in one DB transaction.
    - Return updated points summary.
@@ -90,6 +91,7 @@ Partially verified / still open:
    - Acceptance:
      - affordable rewards redeem cleanly.
      - insufficient balance returns `409 INSUFFICIENT_POINTS`.
+     - repeated clicks or retried requests do not create duplicate spends.
 
 8. [ ] Milestone 12 — Dashboard API and dashboard UI
    - Implement `GET /api/dashboard`.

@@ -31,6 +31,12 @@ export interface RedemptionRecord {
   redeemedAt: string
 }
 
+export interface RewardRedemptionResult {
+  success: true
+  redemption: RedemptionRecord
+  points: PointsSummary
+}
+
 export interface PointsSummary {
   currentBalance: number
   lifetimeEarned: number
