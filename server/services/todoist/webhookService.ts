@@ -5,6 +5,7 @@ import { getDb } from '../../db/client'
 import { itemMappingsRepository } from '../../repositories/item-mappings'
 import { ledgerRepository } from '../../repositories/ledger'
 import { settingsRepository } from '../../repositories/settings'
+import { streaksRepository } from '../../repositories/streaks'
 import type { TaskWithMetaRow } from '../../repositories/tasks'
 import { tasksRepository } from '../../repositories/tasks'
 import { usersRepository } from '../../repositories/users'
@@ -14,6 +15,7 @@ import {
   calculateCompletionBonus,
   calculateTaskPoints
 } from '../points/pointsEngineService'
+import { streakService, yesterdayUtc } from '../streaks/streakService'
 
 interface TodoistWebhookPayload {
   event_name?: string
@@ -146,6 +148,13 @@ function buildEventKey(payload: TodoistWebhookPayload, fallbackSource: string) {
   return `${eventName}:${userId}:${itemId}:${fallbackSource}`
 }
 
+function extractActivityDate(payload: TodoistWebhookPayload): string {
+  if (typeof payload.triggered_at === 'string' && payload.triggered_at.length >= 10) {
+    return payload.triggered_at.slice(0, 10)
+  }
+  return new Date().toISOString().slice(0, 10)
+}
+
 function isCompletionEvent(payload: TodoistWebhookPayload): boolean {
   const eventName = extractEventName(payload)
 
@@ -162,14 +171,14 @@ async function processSubtaskCompletion(
   subtaskTodoistItemId: string,
   parentTodoistItemId: string | null,
   eventKey: string
-) {
+): Promise<{ pointsEarned: number }> {
   const [settings, subtaskRow] = await Promise.all([
     settingsRepository.findByUserIdInTransaction(tx, userId),
     tasksRepository.findTaskByTodoistItemIdInTransaction(tx, userId, subtaskTodoistItemId)
   ])
 
   if (!subtaskRow) {
-    return
+    return { pointsEarned: 0 }
   }
 
   const subtaskPoints = calculateTaskPoints(rowToTaskMetadata(subtaskRow), settings)
@@ -190,14 +199,16 @@ async function processSubtaskCompletion(
     }
   })
 
+  let totalPointsEarned = subtaskPoints
+
   if (!parentTodoistItemId) {
-    return
+    return { pointsEarned: totalPointsEarned }
   }
 
   const [counts] = await tasksRepository.getSubtaskCountsInTransaction(tx, userId, [parentTodoistItemId])
 
   if (!counts || counts.subtaskCount === 0 || counts.completedSubtaskCount !== counts.subtaskCount) {
-    return
+    return { pointsEarned: totalPointsEarned }
   }
 
   await itemMappingsRepository.markCompletionInTransaction(tx, userId, parentTodoistItemId, true)
@@ -205,33 +216,34 @@ async function processSubtaskCompletion(
   const parentRow = await tasksRepository.findTaskByTodoistItemIdInTransaction(tx, userId, parentTodoistItemId)
 
   if (!parentRow || !parentRow.completionBonusEnabled) {
-    return
+    return { pointsEarned: totalPointsEarned }
   }
 
   const taskPoints = calculateTaskPoints(rowToTaskMetadata(parentRow), settings)
   const bonusAmount = calculateCompletionBonus(taskPoints, parentRow.completionBonusPercent)
 
-  if (bonusAmount <= 0) {
-    return
+  if (bonusAmount > 0) {
+    await ledgerRepository.createTransactionAndUpdateBalanceInTransactionIdempotent(tx, {
+      userId,
+      transactionType: 'bonus',
+      amount: bonusAmount,
+      description: `Completed task bonus: ${parentRow.title}`,
+      source: 'todoist_webhook_task_completion_bonus',
+      relatedEntityType: 'task',
+      relatedEntityId: parentTodoistItemId,
+      idempotencyKey: `todoist_webhook:task_completion_bonus:${userId}:${parentTodoistItemId}`,
+      metadata: {
+        eventKey,
+        itemType: 'task',
+        todoistItemId: parentTodoistItemId,
+        bonusPercent: parentRow.completionBonusPercent,
+        basePoints: taskPoints
+      }
+    })
+    totalPointsEarned += bonusAmount
   }
 
-  await ledgerRepository.createTransactionAndUpdateBalanceInTransactionIdempotent(tx, {
-    userId,
-    transactionType: 'bonus',
-    amount: bonusAmount,
-    description: `Completed task bonus: ${parentRow.title}`,
-    source: 'todoist_webhook_task_completion_bonus',
-    relatedEntityType: 'task',
-    relatedEntityId: parentTodoistItemId,
-    idempotencyKey: `todoist_webhook:task_completion_bonus:${userId}:${parentTodoistItemId}`,
-    metadata: {
-      eventKey,
-      itemType: 'task',
-      todoistItemId: parentTodoistItemId,
-      bonusPercent: parentRow.completionBonusPercent,
-      basePoints: taskPoints
-    }
-  })
+  return { pointsEarned: totalPointsEarned }
 }
 
 export const todoistWebhookService = {
@@ -309,6 +321,10 @@ export const todoistWebhookService = {
       }
     }
 
+    // Catch up any missed days before opening the main transaction so that
+    // streak state is current before the current day is evaluated.
+    await streakService.ensureEvaluatedThroughDate(user.id, yesterdayUtc())
+
     const db = getDb()
 
     return db.transaction(async (tx) => {
@@ -355,15 +371,34 @@ export const todoistWebhookService = {
         true
       )
 
+      const activityDate = extractActivityDate(payload)
+      let pointsEarned = 0
+
       if (mapping.itemType === 'subtask') {
-        await processSubtaskCompletion(
+        const result = await processSubtaskCompletion(
           tx as unknown as DatabaseClient,
           user.id,
           mapping.todoistItemId,
           mapping.parentTodoistItemId,
           eventKey
         )
+        pointsEarned = result.pointsEarned
       }
+
+      // Update the per-day aggregate then evaluate streak for this date
+      await streaksRepository.upsertHistoryIncrementAggregatesInTransaction(
+        tx as unknown as DatabaseClient,
+        user.id,
+        activityDate,
+        pointsEarned,
+        mapping.itemType === 'subtask' ? 1 : 0
+      )
+
+      await streakService.evaluateDayInTransaction(
+        tx as unknown as DatabaseClient,
+        user.id,
+        activityDate
+      )
 
       await webhookDeliveriesRepository.updateStatusByIdInTransaction(
         tx as unknown as DatabaseClient,

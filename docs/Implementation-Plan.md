@@ -112,7 +112,7 @@ Partially verified / still open:
      - invalid signatures are rejected.
      - duplicate deliveries do not double-award points.
 
-10. [ ] Milestone 14 — Streak engine
+10. [x] Milestone 14 — Streak engine
    - Implement `streakService.evaluateDay(userId, date)`.
    - Support completed-item and minimum-points rule types.
    - Track current streak, longest streak, and last qualified date.

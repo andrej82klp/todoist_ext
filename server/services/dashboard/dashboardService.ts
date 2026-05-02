@@ -14,6 +14,7 @@ import { settingsRepository } from '../../repositories/settings'
 import { tasksRepository } from '../../repositories/tasks'
 import { notFoundError } from '../../utils/api'
 import { pointsEngineService } from '../points/pointsEngineService'
+import { streakService, yesterdayUtc } from '../streaks/streakService'
 import { taskAssemblyService } from '../tasks/taskAssemblyService'
 
 type MilestoneRow = Awaited<ReturnType<typeof settingsRepository.findMilestonesByUserId>>[number]
@@ -150,6 +151,10 @@ function mapNotification(row: NotificationRow): DashboardNotification {
 export const dashboardService = {
   async getDashboard(userId: string): Promise<DashboardSummary> {
     await settingsRepository.ensureDefaults(userId)
+
+    // Catch up any unevaluated days so the streak summary and protection
+    // banners are current before we read them.
+    await streakService.ensureEvaluatedThroughDate(userId, yesterdayUtc())
 
     const [
       balanceRow,
