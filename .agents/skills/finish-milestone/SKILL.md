@@ -55,17 +55,12 @@ Example agent prompts
 - "Run the Finish-Milestone skill: check server, run linter, run tests, and report results." 
 - "After feature X, run the finish-milestone checklist and fix any lint or test failures." 
 
-Credentials (placeholder)
+Where are the credentials stored?
 -------------------------
-- Email: andrej.edge@outlook.com
-- Password: ******** (masked placeholder — assume correct; do not request or log the real password)
-
-Where to store credentials
--------------------------
-- Store local verification credentials in `.secrets/todoist.env` (already ignored by git).
+- Credentials for local verification are stored in `/workspaces/todoist_ext/.secrets/todoist.env` (already ignored by git).
 - File contents example:
 
-  TODOIST_EMAIL=andrej.edge@outlook.com
+  TODOIST_EMAIL=test@example.com
   TODOIST_PASSWORD=********
 
 - Agents and local scripts should load this file with `dotenv` and must never commit the real values.

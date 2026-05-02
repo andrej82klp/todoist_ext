@@ -55,6 +55,50 @@ export interface StreakSummary {
   } | null
 }
 
+export interface DashboardTaskSummary {
+  id: string
+  todoistTaskId: string
+  title: string
+  deadline: string | null
+  priority: PriorityLevel
+  difficulty: number
+  estimatedPoints: number
+  progressPercent: number | null
+}
+
+export interface DashboardRewardProgress {
+  closestReward: {
+    id: string
+    name: string
+    costPoints: number
+    pointsNeeded: number
+  } | null
+}
+
+export interface DashboardNotification {
+  id: string
+  type: 'streak_protection_used' | 'system'
+  severity: 'info' | 'warning' | 'critical'
+  title: string
+  message: string
+  requiresAcknowledgement: boolean
+  createdAt: string
+}
+
+export interface DashboardNotificationAcknowledgementResult {
+  success: true
+  notificationId: string
+}
+
+export interface DashboardSummary {
+  points: PointsSummary
+  streak: StreakSummary
+  todayTasks: DashboardTaskSummary[]
+  recentTransactions: LedgerTransaction[]
+  rewardProgress: DashboardRewardProgress
+  notifications: DashboardNotification[]
+}
+
 export interface TodoistTaskMetadata {
   priority: PriorityLevel
   difficulty: number
