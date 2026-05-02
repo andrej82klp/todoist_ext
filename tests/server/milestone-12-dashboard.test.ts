@@ -154,8 +154,8 @@ describe('Milestone 12 — dashboard API (authenticated)', () => {
         ruleType: 'completed_items',
         ruleValue: 1,
         nextMilestone: {
-          days: 3,
-          remainingDays: 3
+          days: 7,
+          remainingDays: 7
         }
       })
       expect(payload.data.todayTasks).toEqual([])

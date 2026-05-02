@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
 import type { PriorityLevel } from '../../shared/types'
+import type { DatabaseClient } from '../db/client'
 import { getDb } from '../db/client'
 import { taskMetadata, todoistItemMappings } from '../db/schema'
 
@@ -58,6 +59,81 @@ const DEFAULT_METADATA: Omit<UpsertTaskMetadataInput, never> = {
   completionBonusPercent: 10,
   badge: null,
   customPointOverride: null
+}
+
+async function selectSubtaskCounts(db: DatabaseClient, userId: string, parentTodoistItemIds: string[]): Promise<SubtaskCountRow[]> {
+  if (parentTodoistItemIds.length === 0) return []
+
+  const subtaskAlias = alias(todoistItemMappings, 'sub')
+
+  const rows = await db
+    .select({
+      parentTodoistItemId: subtaskAlias.parentTodoistItemId,
+      subtaskCount: sql<number>`COUNT(*)::int`,
+      completedSubtaskCount: sql<number>`COUNT(*) FILTER (WHERE ${subtaskAlias.isCompleted} = true)::int`
+    })
+    .from(subtaskAlias)
+    .where(and(
+      eq(subtaskAlias.userId, userId),
+      eq(subtaskAlias.itemType, 'subtask'),
+      inArray(subtaskAlias.parentTodoistItemId, parentTodoistItemIds)
+    ))
+    .groupBy(subtaskAlias.parentTodoistItemId)
+
+  return rows.map(r => ({
+    parentTodoistItemId: r.parentTodoistItemId!,
+    subtaskCount: r.subtaskCount,
+    completedSubtaskCount: r.completedSubtaskCount
+  }))
+}
+
+async function selectTaskByTodoistItemId(
+  db: DatabaseClient,
+  userId: string,
+  todoistItemId: string
+): Promise<TaskWithMetaRow | null> {
+  const [row] = await db
+    .select({
+      id: todoistItemMappings.id,
+      todoistItemId: todoistItemMappings.todoistItemId,
+      projectTodoistId: todoistItemMappings.projectTodoistId,
+      title: todoistItemMappings.title,
+      dueAt: todoistItemMappings.dueAt,
+      isCompleted: todoistItemMappings.isCompleted,
+      priority: taskMetadata.priority,
+      difficulty: taskMetadata.difficulty,
+      timeEstimateMinutes: taskMetadata.timeEstimateMinutes,
+      completionBonusEnabled: taskMetadata.completionBonusEnabled,
+      completionBonusPercent: taskMetadata.completionBonusPercent,
+      badge: taskMetadata.badge,
+      customPointOverride: taskMetadata.customPointOverride
+    })
+    .from(todoistItemMappings)
+    .leftJoin(
+      taskMetadata,
+      and(
+        eq(taskMetadata.todoistItemMappingId, todoistItemMappings.id),
+        eq(taskMetadata.userId, userId)
+      )
+    )
+    .where(and(
+      eq(todoistItemMappings.userId, userId),
+      eq(todoistItemMappings.todoistItemId, todoistItemId)
+    ))
+    .limit(1)
+
+  if (!row) return null
+
+  return {
+    ...row,
+    priority: (row.priority ?? DEFAULT_METADATA.priority) as PriorityLevel,
+    difficulty: row.difficulty ?? DEFAULT_METADATA.difficulty,
+    timeEstimateMinutes: row.timeEstimateMinutes ?? DEFAULT_METADATA.timeEstimateMinutes,
+    completionBonusEnabled: row.completionBonusEnabled ?? DEFAULT_METADATA.completionBonusEnabled,
+    completionBonusPercent: Number(row.completionBonusPercent ?? DEFAULT_METADATA.completionBonusPercent),
+    badge: row.badge ?? DEFAULT_METADATA.badge,
+    customPointOverride: row.customPointOverride ?? DEFAULT_METADATA.customPointOverride
+  }
 }
 
 export const tasksRepository = {
@@ -166,31 +242,22 @@ export const tasksRepository = {
     }
   },
 
-  async getSubtaskCounts(userId: string, parentTodoistItemIds: string[]): Promise<SubtaskCountRow[]> {
-    if (parentTodoistItemIds.length === 0) return []
-
+  async findTaskByTodoistItemId(userId: string, todoistItemId: string): Promise<TaskWithMetaRow | null> {
     const db = getDb()
-    const subtaskAlias = alias(todoistItemMappings, 'sub')
+    return selectTaskByTodoistItemId(db, userId, todoistItemId)
+  },
 
-    const rows = await db
-      .select({
-        parentTodoistItemId: subtaskAlias.parentTodoistItemId,
-        subtaskCount: sql<number>`COUNT(*)::int`,
-        completedSubtaskCount: sql<number>`COUNT(*) FILTER (WHERE ${subtaskAlias.isCompleted} = true)::int`
-      })
-      .from(subtaskAlias)
-      .where(and(
-        eq(subtaskAlias.userId, userId),
-        eq(subtaskAlias.itemType, 'subtask'),
-        inArray(subtaskAlias.parentTodoistItemId, parentTodoistItemIds)
-      ))
-      .groupBy(subtaskAlias.parentTodoistItemId)
+  async findTaskByTodoistItemIdInTransaction(tx: DatabaseClient, userId: string, todoistItemId: string): Promise<TaskWithMetaRow | null> {
+    return selectTaskByTodoistItemId(tx, userId, todoistItemId)
+  },
 
-    return rows.map(r => ({
-      parentTodoistItemId: r.parentTodoistItemId!,
-      subtaskCount: r.subtaskCount,
-      completedSubtaskCount: r.completedSubtaskCount
-    }))
+  async getSubtaskCounts(userId: string, parentTodoistItemIds: string[]): Promise<SubtaskCountRow[]> {
+    const db = getDb()
+    return selectSubtaskCounts(db, userId, parentTodoistItemIds)
+  },
+
+  async getSubtaskCountsInTransaction(tx: DatabaseClient, userId: string, parentTodoistItemIds: string[]): Promise<SubtaskCountRow[]> {
+    return selectSubtaskCounts(tx, userId, parentTodoistItemIds)
   },
 
   async getSubtasksForTask(userId: string, parentTodoistItemId: string): Promise<SubtaskRow[]> {

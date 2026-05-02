@@ -93,7 +93,7 @@ Partially verified / still open:
      - insufficient balance returns `409 INSUFFICIENT_POINTS`.
      - repeated clicks or retried requests do not create duplicate spends.
 
-8. [ ] Milestone 12 — Dashboard API and dashboard UI
+8. [x] Milestone 12 — Dashboard API and dashboard UI
    - Implement `GET /api/dashboard`.
    - Implement `POST /api/dashboard/notifications/:notificationId/acknowledge`.
    - Return points summary, streak summary, today’s tasks, recent transactions, reward progress, and notifications from one endpoint.
@@ -102,7 +102,7 @@ Partially verified / still open:
      - dashboard loads from one endpoint.
      - empty states and notification acknowledgement work.
 
-9. [ ] Milestone 13 — Webhook receiver and idempotent completion processing
+9. [x] Milestone 13 — Webhook receiver and idempotent completion processing
    - Implement `POST /api/todoist/webhook`.
    - Verify webhook signature.
    - Deduplicate deliveries.

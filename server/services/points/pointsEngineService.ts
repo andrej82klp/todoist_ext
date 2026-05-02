@@ -51,6 +51,10 @@ export interface ManualAdjustmentInput {
   metadata?: Record<string, unknown> | undefined
 }
 
+export interface AwardTaskCompletionInTransactionInput extends AwardTaskCompletionInput {
+  db: DatabaseClient
+}
+
 function balanceRowToSummary(row: { currentBalance: number, lifetimeEarned: number, lifetimeSpent: number }): PointsSummary {
   return {
     currentBalance: row.currentBalance,
@@ -145,6 +149,53 @@ export const pointsEngineService = {
         pointsSummary: balanceRowToSummary(finalBalance)
       }
     })
+  },
+
+  async awardTaskCompletionInTransaction(input: AwardTaskCompletionInTransactionInput) {
+    const earnedResult = await ledgerRepository.createTransactionAndUpdateBalanceInTransaction(input.db, {
+      userId: input.userId,
+      transactionType: 'earned',
+      amount: input.earnedAmount,
+      description: input.description,
+      source: input.source,
+      relatedEntityType: input.relatedEntityType ?? null,
+      relatedEntityId: input.relatedEntityId ?? null,
+      idempotencyKey: input.idempotencyKey ?? null,
+      metadata: input.metadata ?? {}
+    })
+
+    let bonusResult: Awaited<ReturnType<typeof ledgerRepository.createTransactionAndUpdateBalanceInTransaction>> | null = null
+
+    if (input.completionBonusEnabled && input.completionBonusPercent > 0) {
+      const bonusAmount = calculateCompletionBonus(input.earnedAmount, input.completionBonusPercent)
+
+      if (bonusAmount > 0) {
+        bonusResult = await ledgerRepository.createTransactionAndUpdateBalanceInTransaction(input.db, {
+          userId: input.userId,
+          transactionType: 'bonus',
+          amount: bonusAmount,
+          description: `Completion bonus (${input.completionBonusPercent}% of ${input.earnedAmount} pts)`,
+          source: input.source,
+          relatedEntityType: input.relatedEntityType ?? null,
+          relatedEntityId: input.relatedEntityId ?? null,
+          idempotencyKey: null,
+          metadata: {
+            ...input.metadata,
+            kind: 'completion_bonus',
+            baseEarnedAmount: input.earnedAmount,
+            bonusPercent: input.completionBonusPercent
+          }
+        })
+      }
+    }
+
+    const finalBalance = bonusResult?.balance ?? earnedResult.balance
+
+    return {
+      earnedTransaction: earnedResult.transaction,
+      bonusTransaction: bonusResult?.transaction ?? null,
+      pointsSummary: balanceRowToSummary(finalBalance)
+    }
   },
 
   async applyManualAdjustment(input: ManualAdjustmentInput) {

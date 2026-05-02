@@ -1,5 +1,6 @@
 import { and, count, eq, sql } from 'drizzle-orm'
 
+import type { DatabaseClient } from '../db/client'
 import { getDb } from '../db/client'
 import { todoistItemMappings } from '../db/schema'
 
@@ -79,5 +80,46 @@ export const itemMappingsRepository = {
         eq(todoistItemMappings.userId, userId),
         eq(todoistItemMappings.itemType, itemType)
       ))
+  },
+
+  async findByUserIdAndTodoistItemId(userId: string, todoistItemId: string) {
+    const db = getDb()
+    const [row] = await db.select()
+      .from(todoistItemMappings)
+      .where(and(
+        eq(todoistItemMappings.userId, userId),
+        eq(todoistItemMappings.todoistItemId, todoistItemId)
+      ))
+      .limit(1)
+
+    return row ?? null
+  },
+
+  async findByUserIdAndTodoistItemIdInTransaction(tx: DatabaseClient, userId: string, todoistItemId: string) {
+    const [row] = await tx.select()
+      .from(todoistItemMappings)
+      .where(and(
+        eq(todoistItemMappings.userId, userId),
+        eq(todoistItemMappings.todoistItemId, todoistItemId)
+      ))
+      .limit(1)
+
+    return row ?? null
+  },
+
+  async markCompletionInTransaction(tx: DatabaseClient, userId: string, todoistItemId: string, isCompleted: boolean) {
+    const [row] = await tx.update(todoistItemMappings)
+      .set({
+        isCompleted,
+        syncedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(todoistItemMappings.userId, userId),
+        eq(todoistItemMappings.todoistItemId, todoistItemId)
+      ))
+      .returning()
+
+    return row ?? null
   }
 }

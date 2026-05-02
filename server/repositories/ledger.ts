@@ -101,6 +101,10 @@ async function applyLedgerChange(tx: DatabaseClient, input: CreateLedgerTransact
   return { transaction: transaction!, balance }
 }
 
+function isUniqueViolation(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505'
+}
+
 export const ledgerRepository = {
   async createTransaction(input: CreateLedgerTransactionInput) {
     const db = getDb()
@@ -127,6 +131,77 @@ export const ledgerRepository = {
 
   async createTransactionAndUpdateBalanceInTransaction(tx: DatabaseClient, input: CreateLedgerTransactionInput) {
     return applyLedgerChange(tx, input)
+  },
+
+  async createTransactionAndUpdateBalanceInTransactionIdempotent(tx: DatabaseClient, input: CreateLedgerTransactionInput) {
+    if (!input.idempotencyKey) {
+      return applyLedgerChange(tx, input)
+    }
+
+    const [existing] = await tx.select()
+      .from(pointLedger)
+      .where(sql`${pointLedger.userId} = ${input.userId} and ${pointLedger.idempotencyKey} = ${input.idempotencyKey}`)
+      .limit(1)
+
+    if (existing) {
+      const [balance] = await tx.select().from(pointBalances).where(eq(pointBalances.userId, input.userId)).limit(1)
+
+      return {
+        transaction: existing,
+        balance: balance ?? {
+          userId: input.userId,
+          currentBalance: 0,
+          lifetimeEarned: 0,
+          lifetimeSpent: 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    }
+
+    try {
+      return await applyLedgerChange(tx, input)
+    } catch (error) {
+      if (!isUniqueViolation(error)) {
+        throw error
+      }
+
+      const [transaction] = await tx.select()
+        .from(pointLedger)
+        .where(sql`${pointLedger.userId} = ${input.userId} and ${pointLedger.idempotencyKey} = ${input.idempotencyKey}`)
+        .limit(1)
+      const [balance] = await tx.select().from(pointBalances).where(eq(pointBalances.userId, input.userId)).limit(1)
+
+      if (!transaction) {
+        throw error
+      }
+
+      return {
+        transaction,
+        balance: balance ?? {
+          userId: input.userId,
+          currentBalance: 0,
+          lifetimeEarned: 0,
+          lifetimeSpent: 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    }
+  },
+
+  async findByUserIdAndIdempotencyKey(userId: string, idempotencyKey: string | null | undefined) {
+    if (!idempotencyKey) {
+      return null
+    }
+
+    const db = getDb()
+    const [row] = await db.select()
+      .from(pointLedger)
+      .where(sql`${pointLedger.userId} = ${userId} and ${pointLedger.idempotencyKey} = ${idempotencyKey}`)
+      .limit(1)
+
+    return row ?? null
   },
 
   async listByUserId(userId: string) {

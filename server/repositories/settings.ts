@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 
+import type { DatabaseClient } from '../db/client'
 import { ensureUserDefaults } from '../db/defaults'
 import { getDb } from '../db/client'
 import { globalSettings, milestoneDefinitions, pointBalances, streakProtection, streakState } from '../db/schema'
@@ -19,6 +20,12 @@ export const settingsRepository = {
   async findByUserId(userId: string) {
     const db = getDb()
     const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.userId, userId)).limit(1)
+
+    return settings ?? null
+  },
+
+  async findByUserIdInTransaction(tx: DatabaseClient, userId: string) {
+    const [settings] = await tx.select().from(globalSettings).where(eq(globalSettings.userId, userId)).limit(1)
 
     return settings ?? null
   },
