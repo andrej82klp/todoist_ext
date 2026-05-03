@@ -123,7 +123,7 @@ Partially verified / still open:
      - protection is consumed once when appropriate.
      - bonuses are awarded once.
 
-11. [ ] Milestone 15 — Nightly reconciliation job
+11. [skip] Milestone 15 — Nightly reconciliation job
    - Implement `POST /api/internal/reconcile`.
    - Restrict it to internal/admin/dev use.
    - Recover missed completions without duplicating already-awarded work.
@@ -133,10 +133,11 @@ Partially verified / still open:
      - reconciliation is safe to rerun.
      - missing completions are recovered exactly once.
 
-12. [ ] Milestone 16 — Analytics summary
-   - Implement `GET /api/analytics/summary`.
-   - Return most rewarding projects, current streak, longest streak, and milestones reached.
-   - Add a lightweight analytics section to the dashboard or a dedicated summary area.
+12. [x] Milestone 16 — Analytics summary
+   - Implemented `GET /api/analytics/summary`.
+   - Returns most rewarding projects (top 5, earned points only), current streak, longest streak, and milestones reached.
+   - Added analytics section with two cards to the dashboard home page.
+   - Detailed execution plan: [Milestone 16 analytics summary plan](../.cursor/plans/milestone_16_analytics_summary_plan.plan.md).
    - Acceptance:
      - analytics summary is correct and remains MVP-scoped.
 

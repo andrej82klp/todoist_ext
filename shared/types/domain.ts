@@ -198,3 +198,20 @@ export interface GlobalSettingsResponse {
   points: GlobalSettingsPoints
   streak: GlobalSettingsStreak
 }
+
+export interface AnalyticsProjectSummary {
+  projectId: string
+  projectName: string
+  pointsEarned: number
+}
+
+export interface AnalyticsStreakHistorySummary {
+  current: number
+  longest: number
+  milestonesReached: number[]
+}
+
+export interface AnalyticsSummary {
+  mostRewardingProjects: AnalyticsProjectSummary[]
+  streakHistory: AnalyticsStreakHistorySummary
+}

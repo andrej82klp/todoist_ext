@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  AnalyticsSummary,
   ApiSuccessResponse,
   DashboardNotification,
   DashboardSummary,
@@ -116,6 +117,21 @@ async function acknowledgeNotification(notificationId: string) {
     acknowledgingId.value = null
   }
 }
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+const {
+  data: analyticsEnvelope,
+  pending: analyticsPending,
+  error: analyticsFetchError,
+  refresh: refreshAnalytics
+} = await useFetch<ApiSuccessResponse<AnalyticsSummary>>('/api/analytics/summary', {
+  credentials: 'include'
+})
+
+const analytics = computed<AnalyticsSummary | null>(() => analyticsEnvelope.value?.data ?? null)
+const mostRewardingProjects = computed(() => analytics.value?.mostRewardingProjects ?? [])
+const analyticsStreak = computed(() => analytics.value?.streakHistory ?? { current: 0, longest: 0, milestonesReached: [] })
 </script>
 
 <template>
@@ -528,6 +544,162 @@ async function acknowledgeNotification(notificationId: string) {
             </div>
           </UCard>
         </div>
+      </section>
+
+      <!-- ── Analytics summary ──────────────────────────────────────────────── -->
+      <section class="grid gap-6 sm:grid-cols-2">
+        <UCard class="border-default/70 bg-background/80 shadow-sm">
+          <template #header>
+            <h2 class="text-lg font-semibold text-highlighted">
+              Most rewarding projects
+            </h2>
+            <p class="text-sm text-toned">
+              Projects that have generated the most earned points.
+            </p>
+          </template>
+
+          <div
+            v-if="analyticsPending"
+            class="space-y-3"
+          >
+            <USkeleton class="h-10 rounded-xl" />
+            <USkeleton class="h-10 rounded-xl" />
+          </div>
+
+          <UAlert
+            v-else-if="analyticsFetchError"
+            color="error"
+            variant="subtle"
+            title="Could not load analytics"
+            class="rounded-xl"
+          >
+            <template #description>
+              <span>{{ (analyticsFetchError as { message?: string }).message ?? 'Unknown error' }}</span>
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                class="ml-2"
+                @click="refreshAnalytics()"
+              >
+                Retry
+              </UButton>
+            </template>
+          </UAlert>
+
+          <div
+            v-else-if="mostRewardingProjects.length === 0"
+            class="rounded-2xl border border-dashed border-default/60 bg-muted/20 px-5 py-8 text-center"
+          >
+            <p
+              class="text-base font-medium text-highlighted"
+            >
+              No completed project activity yet
+            </p>
+            <p class="mt-2 text-sm text-toned">
+              Complete tasks through Todoist to see which projects earn the most points.
+            </p>
+          </div>
+
+          <div
+            v-else
+            class="space-y-3"
+          >
+            <article
+              v-for="(project, index) in mostRewardingProjects"
+              :key="project.projectId"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-default/60 bg-background/65 px-4 py-3"
+            >
+              <div class="flex min-w-0 items-center gap-3">
+                <span
+                  class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-toned"
+                >
+                  {{ index + 1 }}
+                </span>
+                <p
+                  class="truncate text-sm font-medium text-highlighted"
+                >
+                  {{ project.projectName }}
+                </p>
+              </div>
+              <p
+                class="shrink-0 text-base font-semibold text-primary"
+              >
+                {{ project.pointsEarned }} pts
+              </p>
+            </article>
+          </div>
+        </UCard>
+
+        <UCard class="border-default/70 bg-background/80 shadow-sm">
+          <template #header>
+            <h2 class="text-lg font-semibold text-highlighted">
+              Streak history
+            </h2>
+            <p class="text-sm text-toned">
+              Lifetime best and milestones you've reached.
+            </p>
+          </template>
+
+          <div
+            v-if="analyticsPending"
+            class="space-y-3"
+          >
+            <USkeleton class="h-10 rounded-xl" />
+            <USkeleton class="h-10 rounded-xl" />
+          </div>
+
+          <div
+            v-else
+            class="space-y-5"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl border border-default/60 bg-muted/20 px-4 py-4">
+                <p class="text-xs font-medium uppercase tracking-wide text-toned">
+                  Current streak
+                </p>
+                <p class="mt-2 text-3xl font-bold text-primary">
+                  {{ analyticsStreak.current }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-default/60 bg-muted/20 px-4 py-4">
+                <p class="text-xs font-medium uppercase tracking-wide text-toned">
+                  Longest streak
+                </p>
+                <p class="mt-2 text-3xl font-bold text-highlighted">
+                  {{ analyticsStreak.longest }}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="mb-3 text-xs font-medium uppercase tracking-wide text-toned">
+                Milestones reached
+              </p>
+              <div
+                v-if="analyticsStreak.milestonesReached.length === 0"
+                class="rounded-2xl border border-dashed border-default/60 bg-muted/20 px-4 py-5 text-center"
+              >
+                <p class="text-sm text-toned">
+                  Keep your streak going to reach your first milestone.
+                </p>
+              </div>
+              <div
+                v-else
+                class="flex flex-wrap gap-2"
+              >
+                <UBadge
+                  v-for="days in analyticsStreak.milestonesReached"
+                  :key="days"
+                  color="primary"
+                  variant="subtle"
+                >
+                  {{ days }} days
+                </UBadge>
+              </div>
+            </div>
+          </div>
+        </UCard>
       </section>
 
       <div
