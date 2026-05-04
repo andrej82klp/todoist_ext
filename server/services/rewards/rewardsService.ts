@@ -10,6 +10,7 @@ import { ledgerRepository } from '../../repositories/ledger'
 import type { RewardRedemptionListRow, RewardRedemptionRow } from '../../repositories/rewards'
 import { rewardsRepository } from '../../repositories/rewards'
 import { ApiHttpError, internalServerError, notFoundError } from '../../utils/api'
+import { logger } from '../../utils/logger'
 import { pointsEngineService } from '../points/pointsEngineService'
 
 type RewardCreateBody = z.infer<typeof rewardCreateSchema>
@@ -195,9 +196,13 @@ export const rewardsService = {
     options?: { idempotencyKey?: string | null }
   ): Promise<RewardRedemptionResult> {
     const idempotencyKey = options?.idempotencyKey?.trim() || null
+
+    logger.info('reward_redemption_attempt', { userId, rewardId })
+
     const existingRedemption = await rewardsRepository.findRedemptionByUserIdAndIdempotencyKey(userId, idempotencyKey)
 
     if (existingRedemption) {
+      logger.info('reward_redemption_idempotent', { userId, rewardId, redemptionId: existingRedemption.id })
       return getRedemptionResultFromExisting(userId, existingRedemption)
     }
 
@@ -213,6 +218,13 @@ export const rewardsService = {
       const currentBalance = balanceRow?.currentBalance ?? 0
 
       if (currentBalance < reward.costPoints) {
+        logger.warn('reward_redemption_insufficient_points', {
+          userId,
+          rewardId,
+          currentBalance,
+          costPoints: reward.costPoints,
+          missingPoints: reward.costPoints - currentBalance
+        })
         throw insufficientPointsError(reward.id, reward.costPoints - currentBalance)
       }
 
@@ -257,6 +269,13 @@ export const rewardsService = {
     })
 
     if (!transactionResult.duplicated) {
+      logger.info('reward_redemption_succeeded', {
+        userId,
+        rewardId,
+        redemptionId: transactionResult.redemption.id,
+        costPoints: reward.costPoints,
+        newBalance: transactionResult.points.currentBalance
+      })
       return {
         success: true,
         redemption: transactionResult.redemption,

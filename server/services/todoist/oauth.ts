@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { API_ERROR_MESSAGE } from '../../../shared/constants/api'
 import { badRequestError, internalServerError } from '../../utils/api'
+import { logger } from '../../utils/logger'
 
 const TODOIST_AUTHORIZE_URL = 'https://app.todoist.com/oauth/authorize'
 const TODOIST_TOKEN_URL = 'https://api.todoist.com/oauth/access_token'
@@ -98,7 +99,7 @@ export async function fetchTodoistUserProfile(accessToken: string): Promise<Todo
   }
 
   if (!response.ok) {
-    console.error('Failed to fetch Todoist profile', {
+    logger.error('todoist_profile_fetch_failed', {
       status: response.status,
       statusText: response.statusText
     })

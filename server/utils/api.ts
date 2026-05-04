@@ -3,6 +3,7 @@ import { defineEventHandler, setResponseStatus } from 'h3'
 import { ZodError } from 'zod'
 
 import { API_ERROR_MESSAGE, API_ERROR_STATUS } from '../../shared/constants/api'
+import { logger } from './logger'
 import type {
   ApiActionResponse,
   ApiCollectionResponse,
@@ -24,6 +25,7 @@ const STATUS_TO_CODE: Record<number, ApiErrorCode> = {
   404: 'NOT_FOUND',
   409: 'CONFLICT',
   422: 'VALIDATION_ERROR',
+  429: 'TOO_MANY_REQUESTS',
   500: 'INTERNAL_SERVER_ERROR'
 }
 
@@ -92,6 +94,10 @@ export function internalServerError(message: string = API_ERROR_MESSAGE.INTERNAL
   return new ApiHttpError(API_ERROR_STATUS.INTERNAL_SERVER_ERROR, 'INTERNAL_SERVER_ERROR', message, details)
 }
 
+export function tooManyRequestsError(message: string = API_ERROR_MESSAGE.TOO_MANY_REQUESTS) {
+  return new ApiHttpError(API_ERROR_STATUS.TOO_MANY_REQUESTS, 'TOO_MANY_REQUESTS', message)
+}
+
 export function zodErrorToValidationDetails(error: ZodError): ValidationErrorDetails {
   const fields: Record<string, string[]> = {}
 
@@ -145,6 +151,16 @@ export function defineApiHandler<T>(handler: ApiHandler<T>): EventHandler {
     } catch (error) {
       const normalizedError = normalizeApiError(error)
       setResponseStatus(event, normalizedError.statusCode)
+
+      if (normalizedError.statusCode >= 500) {
+        logger.error('unhandled_server_error', {
+          route: event.path,
+          method: event.method,
+          statusCode: normalizedError.statusCode,
+          errorCode: normalizedError.code,
+          message: normalizedError.message
+        })
+      }
 
       return apiError(normalizedError.code, normalizedError.message, normalizedError.details)
     }

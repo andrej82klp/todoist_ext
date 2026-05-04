@@ -11,6 +11,7 @@ import { tasksRepository } from '../../repositories/tasks'
 import { usersRepository } from '../../repositories/users'
 import { webhookDeliveriesRepository } from '../../repositories/webhook-deliveries'
 import { badRequestError } from '../../utils/api'
+import { logger } from '../../utils/logger'
 import {
   calculateCompletionBonus,
   calculateTaskPoints
@@ -268,6 +269,8 @@ export const todoistWebhookService = {
     const payloadFingerprint = createHash('sha256').update(input.rawBody).digest('hex')
     const eventKey = buildEventKey(payload, payloadFingerprint)
 
+    logger.info('webhook_received', { deliveryKey: input.deliveryKey, eventKey })
+
     if (!isCompletionEvent(payload)) {
       const record = await webhookDeliveriesRepository.create({
         userId: null,
@@ -275,6 +278,13 @@ export const todoistWebhookService = {
         eventKey,
         status: 'ignored_non_completion',
         payload: payload as Record<string, unknown>
+      })
+
+      logger.info('webhook_ignored', {
+        deliveryKey: input.deliveryKey,
+        eventKey,
+        reason: 'non_completion',
+        duplicated: record === null
       })
 
       return {
@@ -296,6 +306,13 @@ export const todoistWebhookService = {
         payload: payload as Record<string, unknown>
       })
 
+      logger.warn('webhook_ignored', {
+        deliveryKey: input.deliveryKey,
+        eventKey,
+        reason: 'missing_fields',
+        duplicated: record === null
+      })
+
       return {
         received: true,
         duplicated: record === null,
@@ -312,6 +329,14 @@ export const todoistWebhookService = {
         eventKey,
         status: 'ignored_unknown_user',
         payload: payload as Record<string, unknown>
+      })
+
+      logger.info('webhook_ignored', {
+        deliveryKey: input.deliveryKey,
+        eventKey,
+        reason: 'unknown_user',
+        todoistUserId,
+        duplicated: record === null
       })
 
       return {
@@ -337,6 +362,11 @@ export const todoistWebhookService = {
       })
 
       if (!record) {
+        logger.info('webhook_duplicate', {
+          deliveryKey: input.deliveryKey,
+          eventKey,
+          userId: user.id
+        })
         return {
           received: true,
           duplicated: true,
@@ -405,6 +435,16 @@ export const todoistWebhookService = {
         record.id,
         'processed'
       )
+
+      logger.info('webhook_processed', {
+        deliveryKey: input.deliveryKey,
+        eventKey,
+        userId: user.id,
+        itemId: completedItemId,
+        itemType: mapping.itemType,
+        pointsEarned,
+        activityDate
+      })
 
       return {
         received: true,

@@ -1,9 +1,18 @@
 import { getHeader, readRawBody } from 'h3'
 
-import { badRequestError, defineApiHandler, success, unauthorizedError } from '../../utils/api'
+import { badRequestError, defineApiHandler, success, tooManyRequestsError, unauthorizedError } from '../../utils/api'
+import { checkRateLimit, createRateLimiter } from '../../utils/rate-limit'
 import { todoistWebhookService } from '../../services/todoist/webhookService'
 
+// 100 webhook deliveries per IP per minute — generous for Todoist's CDN egress
+// but still guards against replay flooding from a single origin.
+const webhookLimiter = createRateLimiter({ windowMs: 60_000, max: 100 })
+
 export default defineApiHandler(async (event) => {
+  if (!checkRateLimit(webhookLimiter, event, 'per-ip')) {
+    throw tooManyRequestsError()
+  }
+
   const rawBody = await readRawBody(event, 'utf8')
 
   if (!rawBody) {

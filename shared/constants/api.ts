@@ -17,6 +17,7 @@ export const API_ERROR_STATUS = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   VALIDATION_ERROR: 422,
+  TOO_MANY_REQUESTS: 429,
   INTERNAL_SERVER_ERROR: 500
 } as const
 
@@ -27,6 +28,7 @@ export const API_ERROR_MESSAGE = {
   NOT_FOUND: 'Resource not found',
   CONFLICT: 'Request conflicts with current resource state',
   VALIDATION_ERROR: 'Invalid request payload',
+  TOO_MANY_REQUESTS: 'Too many requests',
   INTERNAL_SERVER_ERROR: 'Internal server error'
 } as const
 

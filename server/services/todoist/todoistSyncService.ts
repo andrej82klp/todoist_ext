@@ -1,5 +1,6 @@
 import type { UpsertItemMappingInput } from '../../repositories/item-mappings'
 import { itemMappingsRepository } from '../../repositories/item-mappings'
+import { logger } from '../../utils/logger'
 import { fetchAllTodoistProjects, fetchAllTodoistTasks } from './sync'
 
 function parseDueDate(due: { date?: string, datetime?: string | null } | null | undefined): Date | null {
@@ -12,6 +13,8 @@ function parseDueDate(due: { date?: string, datetime?: string | null } | null | 
 
 export const todoistSyncService = {
   async runInitialSync(userId: string, accessToken: string): Promise<{ projectCount: number, taskCount: number, subtaskCount: number }> {
+    logger.info('todoist_sync_started', { userId })
+
     const [projects, tasks] = await Promise.all([
       fetchAllTodoistProjects(accessToken),
       fetchAllTodoistTasks(accessToken)
@@ -43,10 +46,14 @@ export const todoistSyncService = {
     const subtaskCount = taskItems.filter(t => t.itemType === 'subtask').length
     const rootTaskCount = taskItems.filter(t => t.itemType === 'task').length
 
-    return {
+    const result = {
       projectCount: projectItems.length,
       taskCount: rootTaskCount,
       subtaskCount
     }
+
+    logger.info('todoist_sync_completed', { userId, ...result })
+
+    return result
   }
 }

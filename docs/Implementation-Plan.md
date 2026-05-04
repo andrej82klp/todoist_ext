@@ -149,12 +149,17 @@ Partially verified / still open:
    - Acceptance:
      - task browsing and metadata editing work end to end.
 
-14. [ ] Milestone 18 — Hardening, security, and observability
-   - Add structured logging for OAuth, sync, webhook, awards, redemptions, and reconciliation outcomes.
-   - Redact secrets from logs.
-   - Verify all write endpoints validate input and enforce user scoping.
-   - Verify all balance-changing operations are transactional.
-   - Add basic rate/abuse protection and a deployment checklist.
+14. [x] Milestone 18 — Hardening, security, and observability
+   - Detailed execution plan: [Milestone 18 hardening, security, and observability plan](../.cursor/plans/milestone_18_hardening_security_observability_plan.plan.md).
+   - Added structured logging (`server/utils/logger.ts`) with automatic redaction of tokens, cookies, secrets, OAuth codes, and HMAC headers.
+   - Added in-process rate limiting (`server/utils/rate-limit.ts`) applied to webhook, OAuth callback, redemption, ledger adjustments, and metadata write routes.
+   - Replaced ad hoc `console.error` calls in OAuth service and callback with structured `logger.error`/`logger.info` events.
+   - Instrumented Todoist sync, webhook processing, and reward redemption with structured outcome events.
+   - Added `tooManyRequestsError` helper and `TOO_MANY_REQUESTS` (429) to shared error constants.
+   - All write routes verified for auth (`requireCurrentUser`), schema validation, and owner scoping.
+   - All balance-changing operations confirmed transactional (unchanged from prior milestones).
+   - Created `tests/server/milestone-18-hardening.test.ts` covering auth guards, validation, cross-user scoping, session secrecy, rate limiter unit tests, and logger redaction unit tests.
+   - Created `docs/DEPLOYMENT.md` with deployment checklist, secret generation guidance, and operations reference.
    - Acceptance:
      - invalid input is consistently rejected.
      - tokens never leak to the frontend.

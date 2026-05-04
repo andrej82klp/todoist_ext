@@ -6,10 +6,15 @@ import { oauthAccountsRepository } from '../../../repositories/oauth-accounts'
 import { usersRepository } from '../../../repositories/users'
 import { exchangeTodoistAuthorizationCode, fetchTodoistUserProfile } from '../../../services/todoist/oauth'
 import { todoistSyncService } from '../../../services/todoist/todoistSyncService'
-import { badRequestError, defineApiHandler, internalServerError } from '../../../utils/api'
+import { badRequestError, defineApiHandler, internalServerError, tooManyRequestsError } from '../../../utils/api'
+import { logger } from '../../../utils/logger'
 import { consumeTodoistOauthState } from '../../../utils/oauth-state'
+import { checkRateLimit, createRateLimiter } from '../../../utils/rate-limit'
 import { setAppSession } from '../../../utils/session'
 import { parseQueryWithSchema } from '../../../utils/validation'
+
+// 10 OAuth callback attempts per IP per minute to guard against replay/flooding.
+const callbackLimiter = createRateLimiter({ windowMs: 60_000, max: 10 })
 
 const oauthCallbackQuerySchema = z.object({
   code: z.string().trim().min(1).optional(),
@@ -18,6 +23,10 @@ const oauthCallbackQuerySchema = z.object({
 }).strict()
 
 export default defineApiHandler(async (event) => {
+  if (!checkRateLimit(callbackLimiter, event, 'per-ip')) {
+    throw tooManyRequestsError()
+  }
+
   const query = parseQueryWithSchema(event, oauthCallbackQuerySchema)
 
   if (query.error) {
@@ -65,8 +74,13 @@ export default defineApiHandler(async (event) => {
 
   setAppSession(event, user.id)
 
-  todoistSyncService.runInitialSync(user.id, token.access_token).catch((err) => {
-    console.error('Initial Todoist sync failed', { userId: user.id, error: err })
+  logger.info('oauth_session_established', { userId: user.id })
+
+  todoistSyncService.runInitialSync(user.id, token.access_token).catch((err: unknown) => {
+    logger.error('todoist_sync_kickoff_failed', {
+      userId: user.id,
+      message: err instanceof Error ? err.message : String(err)
+    })
   })
 
   return sendRedirect(event, '/', 302)
