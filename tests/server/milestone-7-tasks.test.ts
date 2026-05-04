@@ -1,7 +1,3 @@
-// Summary: Tests for task-related API endpoints and business logic.
-// Verifies: task creation, retrieval, metadata updates, bulk operations, and validation edge cases.
-// Requires: test DB (`DATABASE_URL`) for integration tests; seed data recommended for deterministic assertions.
-
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -28,7 +24,6 @@ import {
 } from '../../server/services/tasks/pointsCalculator'
 import type { EnrichedTask, TaskSubtaskSummary } from '../../shared/types'
 
-// Helper: toggles DB-backed integration tests when `DATABASE_URL` is provided.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -38,8 +33,6 @@ function authHeader(cookie: string) {
   return { cookie }
 }
 
-// Setup: boot local H3 server with session middleware and task-related routes.
-// This allows tests to exercise request/response flows and middleware logic.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-7-test-secret'
 
@@ -145,8 +138,7 @@ describe('Milestone 7 — task list and metadata API', () => {
   })
 
   runIfDatabaseConfigured('GET /api/tasks returns enriched tasks with metadata defaults', async () => {
-      // Test: batch metadata updates apply to multiple tasks and return updated mappings.
-      const db = getDb()
+    const db = getDb()
     const [user] = await db.insert(users).values({
       email: 'tasks-list@example.com',
       todoistUserId: 'tasks-todoist-list'

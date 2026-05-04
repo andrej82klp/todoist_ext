@@ -11,10 +11,17 @@ import type {
 
 type SortByValue = 'none' | 'priority' | 'difficulty' | 'estimatedPoints' | 'deadline'
 
+interface ParsedTaskRouteQuery {
+  projectId: string
+  sortBy: SortByValue
+  sortOrder: 'asc' | 'desc'
+  includeCompleted: boolean
+  page: number
+}
+
 const PAGE_SIZE = 20
 
 const route = useRoute()
-const router = useRouter()
 
 const selectedProjectId = ref('')
 const selectedSortBy = ref<SortByValue>('none')
@@ -90,7 +97,7 @@ function parsePositivePage(value: unknown): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
 }
 
-function parseRouteQuery(query: Record<string, unknown>) {
+function parseRouteQuery(query: Record<string, unknown>): ParsedTaskRouteQuery {
   const sortBy = asQueryValue(query.sortBy)
   const sortOrder = asQueryValue(query.sortOrder)
 
@@ -174,17 +181,11 @@ watch(
   () => route.query,
   (nextQuery) => {
     applyQueryToState(nextQuery)
+    void refreshList()
   }
 )
 
-watch([selectedProjectId, selectedSortBy, selectedSortOrder, includeCompleted], () => {
-  if (!routeHydrated.value || applyingRouteQuery.value) return
-  if (currentPage.value !== 1) {
-    currentPage.value = 1
-  }
-})
-
-watch([selectedProjectId, selectedSortBy, selectedSortOrder, includeCompleted, currentPage], async () => {
+async function syncRouteFromState() {
   if (!routeHydrated.value || applyingRouteQuery.value) return
 
   const currentQuery = normalizeRouteQuery(route.query)
@@ -194,8 +195,19 @@ watch([selectedProjectId, selectedSortBy, selectedSortOrder, includeCompleted, c
     return
   }
 
-  await router.replace({ query: nextQuery })
-})
+  await navigateTo({ path: route.path, query: nextQuery }, { replace: true })
+}
+
+async function onListControlsChanged() {
+  await nextTick()
+
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  }
+
+  await syncRouteFromState()
+  await refreshList()
+}
 
 const listQuery = computed(() => ({
   projectId: selectedProjectId.value || undefined,
@@ -208,15 +220,27 @@ const listQuery = computed(() => ({
 
 type TaskListResponse = ApiCollectionResponse<EnrichedTask, TaskListMeta>
 
-const {
-  data: listEnvelope,
-  pending: listPending,
-  error: listError,
-  refresh: refreshList
-} = await useFetch<TaskListResponse>('/api/tasks', {
-  credentials: 'include',
-  query: listQuery
-})
+const listEnvelope = ref<TaskListResponse | null>(null)
+const listPending = ref(false)
+const listError = ref<Error | null>(null)
+
+async function refreshList() {
+  listPending.value = true
+  listError.value = null
+
+  try {
+    listEnvelope.value = await $fetch<TaskListResponse>('/api/tasks', {
+      credentials: 'include',
+      query: listQuery.value
+    })
+  } catch (fetchError: unknown) {
+    listError.value = new Error(parseApiErrorMessage(fetchError, 'Could not load tasks'))
+  } finally {
+    listPending.value = false
+  }
+}
+
+await refreshList()
 
 const tasks = computed(() => listEnvelope.value?.data ?? [])
 const listMeta = computed<TaskListMeta>(() => listEnvelope.value?.meta ?? {
@@ -258,8 +282,17 @@ watch([() => listMeta.value.total, () => listMeta.value.pageSize], () => {
   }
 })
 
-function goToPage(page: number) {
-  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
+async function goToPage(page: number) {
+  const nextPage = Math.max(1, Math.min(page, totalPages.value))
+
+  if (nextPage === currentPage.value) {
+    return
+  }
+
+  currentPage.value = nextPage
+
+  await syncRouteFromState()
+  await refreshList()
 }
 
 function resetMetadataForm(metadata: TodoistTaskMetadata) {
@@ -294,10 +327,11 @@ function parseApiErrorMessage(fetchError: unknown, fallbackMessage: string): str
     const firstEntry = Object.entries(fieldErrors)[0]
     if (firstEntry) {
       const [field, messages] = firstEntry
-      if (messages.length > 0) {
+      const firstMessage = messages[0]
+      if (firstMessage) {
         return field === '_root'
-          ? messages[0]
-          : `${field}: ${messages[0]}`
+          ? firstMessage
+          : `${field}: ${firstMessage}`
       }
     }
   }
@@ -438,6 +472,7 @@ function deadlineColor(task: EnrichedTask) {
             v-model="selectedProjectId"
             data-testid="tasks-project-filter"
             class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm"
+            @change="onListControlsChanged"
           >
             <option
               v-for="option in projectFilterOptions"
@@ -454,6 +489,7 @@ function deadlineColor(task: EnrichedTask) {
             v-model="selectedSortBy"
             data-testid="tasks-sort-by"
             class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm"
+            @change="onListControlsChanged"
           >
             <option
               v-for="option in sortByOptions"
@@ -471,6 +507,7 @@ function deadlineColor(task: EnrichedTask) {
             data-testid="tasks-sort-order"
             :disabled="selectedSortBy === 'none'"
             class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm disabled:opacity-60"
+            @change="onListControlsChanged"
           >
             <option
               v-for="option in sortOrderOptions"
@@ -486,7 +523,9 @@ function deadlineColor(task: EnrichedTask) {
           <div class="h-full flex items-end">
             <UCheckbox
               v-model="includeCompleted"
+              data-testid="tasks-include-completed"
               label="Include completed"
+              @update:model-value="onListControlsChanged"
             />
           </div>
         </UFormField>
@@ -504,7 +543,7 @@ function deadlineColor(task: EnrichedTask) {
         <UButton
           label="Retry"
           size="sm"
-          @click="refreshList"
+          @click="() => refreshList()"
         />
       </template>
     </UAlert>
