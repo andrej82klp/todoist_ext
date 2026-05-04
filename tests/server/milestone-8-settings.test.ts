@@ -1,3 +1,7 @@
+// Summary: Tests for user/application settings endpoints and validation.
+// Verifies: reading and updating settings, permission enforcement, and validation error cases.
+// Requires: test DB (`DATABASE_URL`) for persisted settings; mocks acceptable for unit-level checks.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -15,6 +19,7 @@ import { ensureUserDefaults } from '../../server/db/defaults'
 import { users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: toggles tests that require a real DB using `DATABASE_URL`.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -24,6 +29,8 @@ function authHeader(cookie: string) {
   return { cookie }
 }
 
+// Setup: boot a local H3 server and attach session middleware so settings
+// endpoints can be exercised with authenticated test sessions.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-8-test-secret'
 
@@ -52,6 +59,7 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: unauthenticated GET /api/settings behavior (access control).
 describe('Milestone 8 — GET /api/settings (unauthenticated)', () => {
   it('returns 401 when not authenticated', async () => {
     const res = await fetch(`${baseUrl}/api/settings`)
@@ -59,6 +67,7 @@ describe('Milestone 8 — GET /api/settings (unauthenticated)', () => {
   })
 })
 
+// Suite: unauthenticated PATCH /api/settings should be rejected.
 describe('Milestone 8 — PATCH /api/settings (unauthenticated)', () => {
   it('returns 401 when not authenticated', async () => {
     const res = await fetch(`${baseUrl}/api/settings`, {
@@ -70,6 +79,7 @@ describe('Milestone 8 — PATCH /api/settings (unauthenticated)', () => {
   })
 })
 
+// Suite: authenticated settings API covers reading and updating nested settings.
 describe('Milestone 8 — settings API (authenticated)', () => {
   runIfDatabaseConfigured('GET /api/settings returns nested defaults', async () => {
     const db = getDb()

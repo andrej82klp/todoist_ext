@@ -1,3 +1,7 @@
+// Summary: Tests for synchronization between local state and Todoist-like sources.
+// Verifies: project/task fetch, mapping, and merge/conflict handling during sync operations.
+// Requires: DATABASE_URL for persisted state when running integration tests; external APIs should be mocked in CI.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -15,6 +19,7 @@ import { itemMappingsRepository } from '../../server/repositories/item-mappings'
 import { fetchAllTodoistProjects, fetchAllTodoistTasks } from '../../server/services/todoist/sync'
 import { todoistSyncService } from '../../server/services/todoist/todoistSyncService'
 
+// Helper: toggle integration tests when a real database is configured via `DATABASE_URL`.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -64,6 +69,8 @@ const MOCK_TASKS = [
   }
 ]
 
+// Helper: makeFetchMock(page2Projects) -> returns a fake `fetch` implementation
+// that simulates the Todoist API responses used by the sync tests.
 function makeFetchMock(page2Projects = false) {
   return async (input: RequestInfo | URL) => {
     const url = typeof input === 'string'
@@ -107,6 +114,8 @@ function makeFetchMock(page2Projects = false) {
   }
 }
 
+// Setup: configure a local H3 server with minimal session support so sync
+// utilities can be exercised in-process without external services.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-6-test-secret'
 
@@ -127,7 +136,9 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: tests the Todoist API client utilities and the sync service.
 describe('Milestone 6 — Todoist sync API client', () => {
+  // Test: fetches all projects and preserves hierarchy from mocked API.
   it('fetches projects from the Todoist API', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock() as typeof fetch
@@ -143,6 +154,7 @@ describe('Milestone 6 — Todoist sync API client', () => {
     }
   })
 
+  // Test: handles paginated project responses and aggregates pages.
   it('fetches all projects across multiple pages', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock(true) as typeof fetch
@@ -155,6 +167,7 @@ describe('Milestone 6 — Todoist sync API client', () => {
     }
   })
 
+  // Test: fetches tasks and excludes items marked as deleted.
   it('fetches active tasks and filters out deleted tasks', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock() as typeof fetch
@@ -168,6 +181,7 @@ describe('Milestone 6 — Todoist sync API client', () => {
     }
   })
 
+  // Test: throws an ApiHttpError when upstream API returns non-2xx.
   it('throws when Todoist API returns a non-2xx response', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = async () => new Response('Unauthorized', {
@@ -187,6 +201,7 @@ describe('Milestone 6 — Todoist sync API client', () => {
 })
 
 describe('Milestone 6 — todoistSyncService.runInitialSync', () => {
+  // Test (DB): persists projects, tasks, and subtasks into item mappings for the user.
   runIfDatabaseConfigured('persists projects, tasks, and subtasks to the database', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock() as typeof fetch
@@ -231,6 +246,7 @@ describe('Milestone 6 — todoistSyncService.runInitialSync', () => {
     }
   })
 
+  // Test (DB): ensures running the initial sync twice is idempotent and does not duplicate mappings.
   runIfDatabaseConfigured('is idempotent — running sync twice does not duplicate rows', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock() as typeof fetch
@@ -257,6 +273,7 @@ describe('Milestone 6 — todoistSyncService.runInitialSync', () => {
 })
 
 describe('Milestone 6 — initialSyncCompleted session readiness', () => {
+  // Test (DB): asserts countByUserId reflects before/after state around initial sync.
   runIfDatabaseConfigured('countByUserId returns 0 before sync and correct count after sync', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock() as typeof fetch
@@ -283,6 +300,7 @@ describe('Milestone 6 — initialSyncCompleted session readiness', () => {
     }
   })
 
+  // Test (DB): verifies session readiness flag `initialSyncCompleted` is set after sync completes.
   runIfDatabaseConfigured('session reports initialSyncCompleted:true once items are synced', async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = makeFetchMock() as typeof fetch

@@ -1,3 +1,7 @@
+// Summary: Tests for dashboard endpoints and notification/metric aggregation.
+// Verifies: dashboard summaries, notifications acknowledgement, and interactions with other services.
+// Requires: test DB (`DATABASE_URL`) seeded with representative data for metric validation.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -19,6 +23,7 @@ import { dashboardNotifications, streakProtection, streakState, users } from '..
 import sessionMiddleware from '../../server/middleware/session'
 import { tasksRepository } from '../../server/repositories/tasks'
 
+// Helper: toggles integration tests that require a test DB connection.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -84,6 +89,8 @@ async function createTask(sessionCookie: string, userId: string, input: {
   return mapping
 }
 
+// Setup: start H3 server with session middleware and dashboard routes so
+// aggregation and notification endpoints can be tested end-to-end.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-12-test-secret'
 
@@ -115,6 +122,7 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: unauthenticated access control for dashboard endpoints.
 describe('Milestone 12 — dashboard API (unauthenticated)', () => {
   it('GET /api/dashboard returns 401', async () => {
     const response = await fetch(`${baseUrl}/api/dashboard`)
@@ -130,6 +138,7 @@ describe('Milestone 12 — dashboard API (unauthenticated)', () => {
   })
 })
 
+// Suite: authenticated dashboard aggregation, notifications, and filtering behavior.
 describe('Milestone 12 — dashboard API (authenticated)', () => {
   runIfDatabaseConfigured('returns an empty dashboard for a fresh user', async () => {
     const db = getDb()

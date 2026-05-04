@@ -1,3 +1,7 @@
+// Summary: Tests for analytics summary endpoints and aggregation correctness.
+// Verifies: summary metrics, date-range handling, and stability of aggregated results.
+// Requires: test DB (`DATABASE_URL`) seeded with analytic events for repeatable outcomes.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -16,11 +20,14 @@ import { itemMappingsRepository } from '../../server/repositories/item-mappings'
 import { streaksRepository } from '../../server/repositories/streaks'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: toggle DB-powered tests when `DATABASE_URL` is available.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
 let baseUrl = ''
 
+// Setup: configure session defaults and start a local H3 server with the
+// minimal routes required for analytics endpoint tests.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-16-test-secret'
 
@@ -33,6 +40,7 @@ beforeAll(async () => {
   app.use(router)
 
   server = createServer(toNodeListener(app))
+
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve())
   })
@@ -98,6 +106,7 @@ async function seedLedgerRow(
 
 // ── Unauthenticated ───────────────────────────────────────────────────────────
 
+// Suite: unauthenticated access for analytics summary endpoint.
 describe('Milestone 16 — GET /api/analytics/summary (unauthenticated)', () => {
   it('returns 401', async () => {
     const res = await fetch(`${baseUrl}/api/analytics/summary`)
@@ -107,6 +116,7 @@ describe('Milestone 16 — GET /api/analytics/summary (unauthenticated)', () => 
 
 // ── Authenticated ─────────────────────────────────────────────────────────────
 
+// Suite: authenticated analytics summary tests covering aggregation and filtering.
 describe('Milestone 16 — analytics summary API (authenticated)', () => {
   runIfDatabaseConfigured('returns empty state for a fresh user', async () => {
     const { user, sessionCookie } = await createTestUser('empty')

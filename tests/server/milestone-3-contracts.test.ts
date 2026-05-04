@@ -1,3 +1,7 @@
+// Summary: Tests for shared API contract endpoints and error normalization.
+// Verifies: single-resource, collection, and action envelopes; validation errors; API error normalization helpers.
+// Requires: local HTTP server (spun up by tests). Set DATABASE_URL to a test DB for full integration runs if needed.
+
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
@@ -24,6 +28,8 @@ import {
 let server: ReturnType<typeof createServer>
 let baseUrl = ''
 
+// Setup: boots a local H3 server with the contract test handlers used below.
+// Starts an HTTP server on localhost with an ephemeral port so tests can fetch handlers.
 beforeAll(async () => {
   const app = createApp()
 
@@ -48,7 +54,9 @@ afterAll(async () => {
   })
 })
 
+// Suite: validates the shared API envelope contracts (single, collection, action, validation).
 describe('Milestone 3 shared contract endpoints', () => {
+  // Test: returns a single-resource envelope matching the documented shape.
   it('returns the documented single-resource envelope', async () => {
     const response = await fetch(`${baseUrl}/api/internal/test-contract/success`)
     const payload = await response.json()
@@ -62,6 +70,7 @@ describe('Milestone 3 shared contract endpoints', () => {
     })
   })
 
+  // Test: returns a collection envelope with meta and expected item count.
   it('returns the documented collection envelope', async () => {
     const response = await fetch(`${baseUrl}/api/internal/test-contract/collection`)
     const payload = await response.json()
@@ -71,6 +80,7 @@ describe('Milestone 3 shared contract endpoints', () => {
     expect(payload.data).toHaveLength(2)
   })
 
+  // Test: action endpoint returns a success envelope with message and flag.
   it('returns the documented action envelope', async () => {
     const response = await fetch(`${baseUrl}/api/internal/test-contract/action`, {
       method: 'POST'
@@ -86,6 +96,7 @@ describe('Milestone 3 shared contract endpoints', () => {
     })
   })
 
+  // Test: validation errors are returned with field-level messages and 422 status.
   it('returns a 422 validation envelope with field-level details', async () => {
     const response = await fetch(`${baseUrl}/api/internal/test-contract/validation`, {
       method: 'POST',

@@ -1,3 +1,7 @@
+// Summary: Tests for ledger endpoints and accounting correctness.
+// Verifies: ledger retrieval, manual adjustments, and interactions with rewards/redemptions.
+// Requires: test DB (`DATABASE_URL`) and seeded ledger entries for deterministic expectations.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -15,6 +19,7 @@ import { ensureUserDefaults } from '../../server/db/defaults'
 import { users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: enable database-backed tests when `DATABASE_URL` exists.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -24,6 +29,8 @@ function authHeader(cookie: string) {
   return { cookie }
 }
 
+// Setup: start a local H3 server with session middleware and ledger endpoints
+// to allow integration-style assertions against ledger handlers.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-9-test-secret'
 
@@ -52,6 +59,7 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: unauthenticated access control for ledger endpoints.
 describe('Milestone 9 — GET /api/ledger (unauthenticated)', () => {
   it('returns 401 when not authenticated', async () => {
     const res = await fetch(`${baseUrl}/api/ledger`)
@@ -59,6 +67,7 @@ describe('Milestone 9 — GET /api/ledger (unauthenticated)', () => {
   })
 })
 
+// Suite: unauthenticated access control for ledger adjustments endpoint.
 describe('Milestone 9 — POST /api/ledger/adjustments (unauthenticated)', () => {
   it('returns 401 when not authenticated', async () => {
     const res = await fetch(`${baseUrl}/api/ledger/adjustments`, {
@@ -70,6 +79,7 @@ describe('Milestone 9 — POST /api/ledger/adjustments (unauthenticated)', () =>
   })
 })
 
+// Suite: authenticated ledger behavior including adjustments and balance tracking.
 describe('Milestone 9 — ledger API (authenticated)', () => {
   runIfDatabaseConfigured('GET /api/ledger returns empty ledger and zero balance for new user', async () => {
     const db = getDb()

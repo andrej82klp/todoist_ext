@@ -16,11 +16,16 @@ import sessionMiddleware from '../../server/middleware/session'
 import { fetchTodoistUserProfile } from '../../server/services/todoist/oauth'
 import { decryptSecret } from '../../server/utils/secrets'
 
+// Summary: Tests the Todoist OAuth start/callback flow and Todoist profile fetch service behavior.
+// Verifies: end-to-end auth/session persistence, invalid state rejection, and profile mapping/fallback handling.
+// Requires: DATABASE_URL for integration path; TODOIST_* env vars are set to test values during setup.
+// Helper: toggles database-backed integration tests when `DATABASE_URL` is present.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
 let baseUrl = ''
 
+// Helper: extracts a single cookie key/value pair from a Set-Cookie header for request replay.
 function extractCookieValue(setCookieHeader: string | null, cookieName: string) {
   if (!setCookieHeader) {
     return null
@@ -31,6 +36,7 @@ function extractCookieValue(setCookieHeader: string | null, cookieName: string) 
   return match ? `${cookieName}=${match[1]}` : null
 }
 
+// Setup: configures auth env defaults and boots a local H3 server with session + auth routes.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-5-test-secret'
   process.env.TODOIST_CLIENT_ID ||= 'test-client-id'
@@ -54,6 +60,7 @@ beforeAll(async () => {
   baseUrl = `http://127.0.0.1:${address.port}`
 })
 
+// Cleanup: shuts down the HTTP server and closes DB connections to avoid cross-test leakage.
 afterAll(async () => {
   await new Promise<void>((resolve, reject) => {
     server.close(error => error ? reject(error) : resolve())
@@ -62,7 +69,10 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: covers OAuth handshake integrity and persistence of user/account/session state.
+// Suite: exercises the OAuth start/callback flow and profile exchange.
 describe('Milestone 5 Todoist OAuth flow', () => {
+  // Test (integration): verifies full OAuth round-trip, token exchange, and session persistence.
   runIfDatabaseConfigured('starts OAuth and completes callback with persisted account and session', async () => {
     const originalFetch = globalThis.fetch
 
@@ -156,6 +166,7 @@ describe('Milestone 5 Todoist OAuth flow', () => {
       expect(sessionPayload.data.user.email).toBe('oauth-user@example.com')
 
       const db = getDb()
+      // DB check: confirms user provisioning happened from OAuth profile identity.
       const [storedUser] = await db.select().from(users)
         .where(eq(users.todoistUserId, 'todoist-user-123'))
         .limit(1)
@@ -167,15 +178,18 @@ describe('Milestone 5 Todoist OAuth flow', () => {
         .limit(1)
 
       expect(storedOauth).toBeTruthy()
+      // Security invariant: access tokens are persisted encrypted, never in plaintext.
       expect(storedOauth!.accessToken).not.toBe('todoist-access-token')
       expect(decryptSecret(storedOauth!.accessToken)).toBe('todoist-access-token')
 
+      // Cleanup: remove inserted user row so reruns stay deterministic.
       await db.delete(users).where(eq(users.id, storedUser!.id))
     } finally {
       globalThis.fetch = originalFetch
     }
   })
 
+  // Unit/integration boundary: invalid or missing state must fail to prevent forged callbacks.
   it('rejects callback when OAuth state is missing or invalid', async () => {
     const response = await fetch(`${baseUrl}/api/auth/todoist/callback?code=test&state=wrong-state`)
     const payload = await response.json()
@@ -185,7 +199,9 @@ describe('Milestone 5 Todoist OAuth flow', () => {
   })
 })
 
+// Suite: validates Todoist profile service mapping and resilience across API responses.
 describe('Milestone 5 fetchTodoistUserProfile service', () => {
+  // Unit: ensures external Todoist payload fields are normalized to internal profile shape.
   it('maps the Todoist profile payload to the app profile shape', async () => {
     const originalFetch = globalThis.fetch
 
@@ -226,6 +242,7 @@ describe('Milestone 5 fetchTodoistUserProfile service', () => {
     }
   })
 
+  // Unit: non-2xx responses are translated into a BAD_REQUEST domain error contract.
   it('throws BAD_REQUEST when Todoist profile API returns a non-2xx response', async () => {
     const originalFetch = globalThis.fetch
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -251,6 +268,7 @@ describe('Milestone 5 fetchTodoistUserProfile service', () => {
     }
   })
 
+  // Unit edge case: if the current endpoint is retired, service falls back to legacy endpoint.
   it('falls back to legacy profile endpoint when current endpoint is gone', async () => {
     const originalFetch = globalThis.fetch
 

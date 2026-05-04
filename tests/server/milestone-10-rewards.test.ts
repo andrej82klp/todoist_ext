@@ -1,3 +1,7 @@
+// Summary: Tests for rewards management endpoints (CRUD and redemptions).
+// Verifies: reward creation, updates, deletion, redemption flow, and permission checks.
+// Requires: test DB (`DATABASE_URL`) and seeded rewards for consistent test outcomes.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -19,6 +23,7 @@ import { ensureUserDefaults } from '../../server/db/defaults'
 import { users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: toggles DB-required tests when `DATABASE_URL` is set.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -28,6 +33,8 @@ function authHeader(cookie: string) {
   return { cookie }
 }
 
+// Setup: starts a local H3 server with session middleware and rewards endpoints.
+// Provides an isolated environment for testing reward CRUD and redemption flows.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-10-test-secret'
 
@@ -60,6 +67,7 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: unauthenticated access control for rewards endpoints.
 describe('Milestone 10 — rewards API (unauthenticated)', () => {
   it('GET /api/rewards returns 401', async () => {
     const res = await fetch(`${baseUrl}/api/rewards`)
@@ -81,6 +89,7 @@ describe('Milestone 10 — rewards API (unauthenticated)', () => {
   })
 })
 
+// Suite: authenticated rewards CRUD and redemption-eligibility behavior.
 describe('Milestone 10 — rewards API (authenticated)', () => {
   runIfDatabaseConfigured('GET /api/rewards fresh user', async () => {
     const db = getDb()

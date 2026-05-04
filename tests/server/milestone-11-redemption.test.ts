@@ -1,3 +1,7 @@
+// Summary: Tests for redemption lifecycle and fulfillment integration.
+// Verifies: creating redemptions, state transitions, ledger impacts, and listing of redemptions.
+// Requires: test DB (`DATABASE_URL`) and seeded rewards/ledger state for deterministic assertions.
+
 import 'dotenv/config'
 
 import { createServer } from 'node:http'
@@ -19,6 +23,7 @@ import { ensureUserDefaults } from '../../server/db/defaults'
 import { users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: only run DB-backed integration tests when `DATABASE_URL` is configured.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -72,6 +77,8 @@ async function adjustPoints(sessionCookie: string, amount: number, reason: strin
   })
 }
 
+// Setup: boot local H3 server with session middleware and rewards/ledger routes
+// to exercise redemption lifecycle end-to-end in tests.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-11-test-secret'
 
@@ -104,6 +111,7 @@ afterAll(async () => {
   await closeDbConnection()
 })
 
+// Suite: unauthenticated access control for redemption endpoint.
 describe('Milestone 11 — reward redemption API (unauthenticated)', () => {
   it('POST /api/rewards/:rewardId/redeem returns 401', async () => {
     const res = await fetch(`${baseUrl}/api/rewards/00000000-0000-0000-0000-000000000000/redeem`, {
@@ -114,6 +122,7 @@ describe('Milestone 11 — reward redemption API (unauthenticated)', () => {
   })
 })
 
+// Suite: authenticated redemption flows including error cases and successful redemption.
 describe('Milestone 11 — reward redemption API (authenticated)', () => {
   runIfDatabaseConfigured('returns 404 when reward is missing', async () => {
     const db = getDb()

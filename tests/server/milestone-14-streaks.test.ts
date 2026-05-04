@@ -1,3 +1,7 @@
+// Summary: Tests for streak progression, protection windows, and milestone awards.
+// Verifies: streak increments/resets, protection behavior, and award assignment logic.
+// Requires: test DB (`DATABASE_URL`) and deterministic timestamps for certain edge-case scenarios.
+
 import 'dotenv/config'
 
 import { createHmac } from 'node:crypto'
@@ -28,6 +32,7 @@ import { streaksRepository } from '../../server/repositories/streaks'
 import { tasksRepository } from '../../server/repositories/tasks'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: enable DB-backed tests when `DATABASE_URL` is set; otherwise they skip.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
@@ -190,6 +195,8 @@ function yesterdayUtc() {
 
 // ── Server setup ───────────────────────────────────────────────────────────────
 
+// Setup: boot a local H3 server with the webhook/streaks endpoints and session middleware.
+// This ensures tests can simulate webhook deliveries and streak calculations end-to-end.
 beforeAll(async () => {
   process.env.TODOIST_CLIENT_SECRET ||= 'milestone-14-test-client-secret'
   process.env.SESSION_SECRET ||= 'milestone-14-test-session-secret'
@@ -218,6 +225,7 @@ afterAll(async () => {
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
+// Suite: unauthenticated access checks for streak/dashboard endpoints.
 describe('Milestone 14 — Streak engine (unauthenticated)', () => {
   it('GET /api/dashboard returns 401 for unauthenticated requests', async () => {
     const response = await fetch(`${baseUrl}/api/dashboard`)
@@ -225,6 +233,7 @@ describe('Milestone 14 — Streak engine (unauthenticated)', () => {
   })
 })
 
+// Suite: database-backed streak engine scenarios verifying streak increments, protection, and notifications.
 describe('Milestone 14 — Streak engine (database)', () => {
   runIfDatabaseConfigured('first qualifying completion day creates streak=1', async () => {
     const db = getDb()

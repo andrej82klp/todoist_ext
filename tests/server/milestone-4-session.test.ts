@@ -5,6 +5,10 @@ import type { AddressInfo } from 'node:net'
 
 import { eq } from 'drizzle-orm'
 import { createApp, toNodeListener } from 'h3'
+// Summary: Tests for session management (authentication/session lifecycle).
+// Verifies: session creation, persistence, and teardown behaviors; middleware handling for authenticated routes.
+// Requires: test DB (`DATABASE_URL`) for session persistence when running integration tests.
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import logoutHandler from '../../server/api/auth/logout.post'
@@ -15,11 +19,15 @@ import { closeDbConnection, getDb } from '../../server/db/client'
 import { users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Helper: toggles tests that require a real database connection.
+// Use `DATABASE_URL` in the environment to enable integration-style tests.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
 let server: ReturnType<typeof createServer>
 let baseUrl = ''
 
+// Setup: configure session env defaults and boot a local H3 server with session/auth routes.
+// This allows tests to exercise session cookies and protected routes.
 beforeAll(async () => {
   process.env.SESSION_SECRET ||= 'milestone-4-test-secret'
 
@@ -50,6 +58,7 @@ afterAll(async () => {
 })
 
 describe('Milestone 4 session foundation', () => {
+  // Test: unauthenticated session response when no session cookie is present.
   it('returns an unauthenticated session state when no session cookie exists', async () => {
     const response = await fetch(`${baseUrl}/api/auth/session`)
     const payload = await response.json()
@@ -64,6 +73,7 @@ describe('Milestone 4 session foundation', () => {
     })
   })
 
+  // Test: protected routes should return 401 if no valid session cookie is supplied.
   it('rejects protected routes with 401 when no session exists', async () => {
     const response = await fetch(`${baseUrl}/api/internal/test-auth/protected`)
     const payload = await response.json()
@@ -72,6 +82,7 @@ describe('Milestone 4 session foundation', () => {
     expect(payload.error.code).toBe('UNAUTHORIZED')
   })
 
+  // Test (DB): simulates an authenticated session, verifies session cookie set and logout clears it.
   runIfDatabaseConfigured('supports a simulated authenticated session in dev/test and clears it on logout', async () => {
     const db = getDb()
     const testSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
