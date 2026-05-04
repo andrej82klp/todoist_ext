@@ -45,7 +45,7 @@ export function success<T>(data: T): ApiSuccessResponse<T> {
   return { data }
 }
 
-export function collection<T>(data: T[], meta: CollectionMeta): ApiCollectionResponse<T> {
+export function collection<T, M extends CollectionMeta>(data: T[], meta: M): ApiCollectionResponse<T, M> {
   return { data, meta }
 }
 

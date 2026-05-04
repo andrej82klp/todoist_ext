@@ -141,7 +141,8 @@ Partially verified / still open:
    - Acceptance:
      - analytics summary is correct and remains MVP-scoped.
 
-13. [ ] Milestone 17 — Task list UI completion
+13. [x] Milestone 17 — Task list UI completion
+   - Detailed execution plan: [Milestone 17 task list UI completion plan](../.cursor/plans/milestone_17_task_list_ui_completion_plan.plan.md).
    - Turn the tasks page into the usable planning view.
    - Surface title, project, priority, difficulty, estimated points, deadline, progress, and progress eligibility.
    - Add sorting controls, filters, metadata editing, and deadline highlighting.

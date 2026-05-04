@@ -131,6 +131,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(payload.data).toEqual([])
       expect(payload.meta.total).toBe(0)
       expect(payload.meta.page).toBe(1)
+      expect(payload.meta.availableProjects).toEqual([])
     } finally {
       await db.delete(users).where(eq(users.id, user.id))
     }
@@ -171,6 +172,7 @@ describe('Milestone 7 — task list and metadata API', () => {
 
       const task1 = payload.data.find((t: EnrichedTask) => t.todoistTaskId === 'task-1')
       expect(task1).toBeTruthy()
+      expect(task1.projectId).toBe('proj-1')
       expect(task1.projectName).toBe('Work')
       expect(task1.hasSubtasks).toBe(true)
       expect(task1.subtaskCount).toBe(1)
@@ -186,6 +188,12 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(task2.hasSubtasks).toBe(false)
       expect(task2.progressPercent).toBeNull()
       expect(task2.eligibleForProgressTracking).toBe(false)
+      expect(payload.meta.availableProjects).toEqual([
+        {
+          id: 'proj-1',
+          name: 'Work'
+        }
+      ])
     } finally {
       await db.delete(users).where(eq(users.id, user.id))
     }
@@ -223,6 +231,60 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(res.status).toBe(200)
       expect(payload.meta.total).toBe(1)
       expect(payload.data[0].todoistTaskId).toBe('task-a1')
+      expect(payload.data[0].projectId).toBe('proj-a')
+      expect(payload.meta.availableProjects).toEqual([
+        {
+          id: 'proj-a',
+          name: 'Alpha'
+        }
+      ])
+    } finally {
+      await db.delete(users).where(eq(users.id, user.id))
+    }
+  })
+
+  runIfDatabaseConfigured('GET /api/tasks returns availableProjects from filtered dataset before pagination', async () => {
+    const db = getDb()
+    const [user] = await db.insert(users).values({
+      email: 'tasks-project-options@example.com',
+      todoistUserId: 'tasks-todoist-project-options'
+    }).returning()
+
+    try {
+      await ensureUserDefaults(user.id)
+
+      await itemMappingsRepository.upsertMany(user.id, [
+        { todoistItemId: 'proj-z', itemType: 'project', title: 'Zeta' },
+        { todoistItemId: 'proj-a', itemType: 'project', title: 'Alpha' },
+        { todoistItemId: 'task-z1', itemType: 'task', title: 'Zeta Task', projectTodoistId: 'proj-z' },
+        { todoistItemId: 'task-a1', itemType: 'task', title: 'Alpha Task', projectTodoistId: 'proj-a' }
+      ])
+
+      const sessionRes = await fetch(`${baseUrl}/api/internal/test-auth/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      })
+      const sessionCookie = sessionRes.headers.get('set-cookie')?.split(';')[0] ?? ''
+
+      const res = await fetch(`${baseUrl}/api/tasks?page=1&pageSize=1`, {
+        headers: authHeader(sessionCookie)
+      })
+      const payload = await res.json()
+
+      expect(res.status).toBe(200)
+      expect(payload.data).toHaveLength(1)
+      expect(payload.meta.total).toBe(2)
+      expect(payload.meta.availableProjects).toEqual([
+        {
+          id: 'proj-a',
+          name: 'Alpha'
+        },
+        {
+          id: 'proj-z',
+          name: 'Zeta'
+        }
+      ])
     } finally {
       await db.delete(users).where(eq(users.id, user.id))
     }

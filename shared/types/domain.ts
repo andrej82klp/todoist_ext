@@ -142,6 +142,18 @@ export interface TaskSubtaskSummary {
   earnedPoints: number | null
 }
 
+export interface TaskListProjectOption {
+  id: string
+  name: string
+}
+
+export interface TaskListMeta {
+  page: number
+  pageSize: number
+  total: number
+  availableProjects: TaskListProjectOption[]
+}
+
 export interface EnrichedTask {
   id: string
   todoistTaskId: string

@@ -1,4 +1,4 @@
-import type { EnrichedTask } from '../../../shared/types'
+import type { EnrichedTask, TaskListProjectOption } from '../../../shared/types'
 import { taskListQuerySchema } from '../../../shared/schemas'
 import type { TASK_SORT_FIELDS } from '../../../shared/constants/api'
 import { collection, defineApiHandler } from '../../utils/api'
@@ -51,9 +51,26 @@ export default defineApiHandler(async (event) => {
     tasks = sortTasks(tasks, query.sortBy, query.sortOrder ?? 'asc')
   }
 
+  const availableProjects: TaskListProjectOption[] = tasks
+    .reduce((acc, task) => {
+      if (task.projectId && task.projectName && !acc.some(project => project.id === task.projectId)) {
+        acc.push({
+          id: task.projectId,
+          name: task.projectName
+        })
+      }
+      return acc
+    }, [] as TaskListProjectOption[])
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   const total = tasks.length
   const start = (query.page - 1) * query.pageSize
   const page = tasks.slice(start, start + query.pageSize)
 
-  return collection(page, { page: query.page, pageSize: query.pageSize, total })
+  return collection(page, {
+    page: query.page,
+    pageSize: query.pageSize,
+    total,
+    availableProjects
+  })
 })

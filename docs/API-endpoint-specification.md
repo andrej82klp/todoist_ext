@@ -487,6 +487,8 @@ Returns task list enriched with app metadata.
 - `page?: number`
 - `pageSize?: number`
 
+`projectId` uses the Todoist project id and matches the `projectId` returned in each task row.
+
 #### Response
 
 ```json
@@ -498,7 +500,6 @@ Returns task list enriched with app metadata.
       "projectId": "proj_1",
       "projectName": "Work",
       "title": "Prepare webinar slides",
-      "description": null,
       "deadline": "2026-04-15",
       "hasSubtasks": true,
       "subtaskCount": 4,
@@ -522,7 +523,13 @@ Returns task list enriched with app metadata.
   "meta": {
     "page": 1,
     "pageSize": 20,
-    "total": 1
+    "total": 1,
+    "availableProjects": [
+      {
+        "id": "proj_1",
+        "name": "Work"
+      }
+    ]
   }
 }
 ```

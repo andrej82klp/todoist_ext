@@ -22,9 +22,9 @@ export interface ApiSuccessResponse<T> {
   data: T
 }
 
-export interface ApiCollectionResponse<T> {
+export interface ApiCollectionResponse<T, M extends CollectionMeta = CollectionMeta> {
   data: T[]
-  meta: CollectionMeta
+  meta: M
 }
 
 export interface ApiActionResponse {

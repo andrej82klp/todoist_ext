@@ -45,7 +45,7 @@ export const taskAssemblyService = {
     )
 
     const projectNameMap = new Map(
-      projectNames.map(p => [p.todoistItemId, { id: p.id, name: p.title }])
+      projectNames.map(p => [p.todoistItemId, p.title])
     )
 
     return rows.map((row) => {
@@ -59,13 +59,13 @@ export const taskAssemblyService = {
 
       const metadata = rowToMetadata(row)
       const estimatedPoints = calculateEstimatedPoints(metadata, pointsSettings)
-      const project = row.projectTodoistId ? projectNameMap.get(row.projectTodoistId) : null
+      const projectName = row.projectTodoistId ? projectNameMap.get(row.projectTodoistId) : null
 
       return {
         id: row.id,
         todoistTaskId: row.todoistItemId,
-        projectId: project?.id ?? null,
-        projectName: project?.name ?? null,
+        projectId: row.projectTodoistId,
+        projectName: projectName ?? null,
         title: row.title,
         deadline: formatDeadline(row.dueAt),
         hasSubtasks,

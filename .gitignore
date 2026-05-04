@@ -27,3 +27,8 @@ ignore
 .pnpm-store
 .claude/agents/todoist-implementation-planner.md
 .secrets/
+
+# Playwright outputs and local auth state
+playwright-report/
+test-results/
+playwright/.auth/
