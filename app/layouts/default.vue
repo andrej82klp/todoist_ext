@@ -21,6 +21,8 @@ const { data: sessionResponse, pending: sessionPending, refresh: refreshSession 
 const sessionState = computed(() => sessionResponse.value?.data ?? defaultSessionState)
 const isAuthenticated = computed(() => sessionState.value.authenticated)
 
+const route = useRoute()
+const isActive = (path: string) => route.path === path
 async function logout() {
   await $fetch('/api/auth/logout', {
     method: 'POST'
@@ -124,9 +126,9 @@ async function logout() {
               v-for="item in navigationItems"
               :key="item.to"
               :to="item.to"
-              color="neutral"
-              variant="ghost"
-              class="font-medium"
+              :color="isActive(item.to) ? 'primary' : 'neutral'"
+              :variant="isActive(item.to) ? 'soft' : 'ghost'"
+              :class="['font-medium', isActive(item.to) ? 'rounded-lg ring-2 ring-primary/30 shadow-sm' : '']"
             >
               {{ item.label }}
             </UButton>
@@ -138,9 +140,9 @@ async function logout() {
             v-for="item in navigationItems"
             :key="item.to"
             :to="item.to"
-            color="neutral"
-            variant="ghost"
-            class="font-medium"
+            :color="isActive(item.to) ? 'primary' : 'neutral'"
+            :variant="isActive(item.to) ? 'soft' : 'ghost'"
+            :class="['font-medium', isActive(item.to) ? 'rounded-lg ring-2 ring-primary/30 shadow-sm' : '']"
           >
             {{ item.label }}
           </UButton>
@@ -205,10 +207,10 @@ async function logout() {
               v-for="item in navigationItems"
               :key="`${item.to}-mobile`"
               :to="item.to"
-              color="neutral"
-              variant="ghost"
+              :color="isActive(item.to) ? 'primary' : 'neutral'"
+              :variant="isActive(item.to) ? 'soft' : 'ghost'"
               block
-              class="justify-start"
+              :class="['justify-start', isActive(item.to) ? 'rounded-lg ring-2 ring-primary/30 shadow-sm' : '']"
             >
               {{ item.label }}
             </UButton>

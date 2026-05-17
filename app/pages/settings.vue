@@ -206,11 +206,11 @@ function removeMilestone(index: number) {
                   v-model.number="form.points.defaultCompletionBonusPercent"
                   type="number"
                   min="0"
-                  step="0.01"
-                  class="w-32"
+                  step="1"
+                  class="w-12"
                   :disabled="!form.points.defaultCompletionBonusEnabled"
                 />
-                <span class="text-sm text-toned">percent</span>
+                <span class="text-sm text-toned">%</span>
               </div>
             </UFormField>
           </div>
