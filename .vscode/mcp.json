@@ -1,0 +1,17 @@
+{
+	"servers": {
+		"neondatabase/mcp-server-neon": {
+			"type": "http",
+			"url": "https://mcp.neon.tech/sse",
+			"gallery": "https://api.mcp.github.com",
+			"version": "1.0.0"
+		},
+		"doist/todoist-ai": {
+			"type": "http",
+			"url": "https://ai.todoist.net/mcp",
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.0.1-seed"
+		}
+	},
+	"inputs": []
+}
