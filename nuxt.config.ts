@@ -20,10 +20,6 @@ export default defineNuxtConfig({
     sessionSecret: process.env.SESSION_SECRET
   },
 
-  routeRules: {
-    '/': { prerender: true }
-  },
-
   compatibilityDate: '2025-01-15',
 
   typescript: {
