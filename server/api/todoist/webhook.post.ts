@@ -83,8 +83,8 @@ function queueWebhookLog(entry: Record<string, unknown>) {
 export default defineApiHandler(async (event) => {
   const requestTs = new Date().toISOString()
   const requestHeaders = normalizeHeaders(event.node.req.headers)
-  const requestMethod = event.node.req.method ?? 'POST'
-  const requestUrl = event.node.req.url ?? '/api/todoist/webhook'
+  const requestMethod = event.method
+  const requestUrl = event.path
   let rawBody = ''
   let deliveryKey: string | null = null
 
