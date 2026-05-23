@@ -77,6 +77,8 @@ void initializeWebhookLogFile().catch((error) => {
 async function writeWebhookLog(entry: Record<string, unknown>) {
   try {
     const line = JSON.stringify(redactForLog(entry))
+    // Ensure the logs directory exists in case initialization hasn't completed.
+    await mkdir(dirname(webhookLogPath), { recursive: true })
     await appendFile(webhookLogPath, `${line}\n`, 'utf8')
   } catch (error) {
     logger.error('webhook_log_write_failed', {
