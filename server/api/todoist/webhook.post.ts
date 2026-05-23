@@ -46,8 +46,18 @@ function toErrorLog(error: unknown) {
     }
   }
 
+  let message: string
+
+  if (typeof error === 'string') {
+    message = error
+  } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+    message = (error as { message?: unknown }).message as string
+  } else {
+    message = 'Unknown error'
+  }
+
   return {
-    message: typeof error === 'string' ? error : 'Unknown error',
+    message,
     detail: error
   }
 }

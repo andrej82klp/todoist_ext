@@ -118,6 +118,11 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
     const db = getDb()
     // Get DB handle for creating test entities and querying results.
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const eventSubtaskOne = `evt-subtask-1-${suffix}`
+    const eventSubtaskTwo = `evt-subtask-2-${suffix}`
+    const deliverySubtaskOne = `delivery-subtask-1-${suffix}`
+    const deliverySubtaskOneDuplicate = `delivery-subtask-1-duplicate-${suffix}`
+    const deliverySubtaskTwo = `delivery-subtask-2-${suffix}`
 
     // Create an isolated test user with a unique `todoistUserId`.
     const [user] = await db.insert(users).values({
@@ -201,14 +206,14 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // The webhook includes an explicit `event_id` which is used for idempotency.
       const firstResult = await sendWebhook({
         event_name: 'item:completed',
-        event_id: 'evt-subtask-1',
+        event_id: eventSubtaskOne,
         event_data: {
           id: 'subtask-1',
           user_id: user.todoistUserId,
           checked: true
         }
       }, {
-        deliveryId: 'delivery-subtask-1'
+        deliveryId: deliverySubtaskOne
       })
 
       expect(firstResult.response.status).toBe(200)
@@ -218,14 +223,14 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // The system should detect the duplicate and NOT award points twice.
       const duplicateResult = await sendWebhook({
         event_name: 'item:completed',
-        event_id: 'evt-subtask-1',
+        event_id: eventSubtaskOne,
         event_data: {
           id: 'subtask-1',
           user_id: user.todoistUserId,
           checked: true
         }
       }, {
-        deliveryId: 'delivery-subtask-1-duplicate'
+        deliveryId: deliverySubtaskOneDuplicate
       })
 
       expect(duplicateResult.response.status).toBe(200)
@@ -235,14 +240,14 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // task should be marked complete and the configured task completion bonus applied.
       const secondResult = await sendWebhook({
         event_name: 'item:completed',
-        event_id: 'evt-subtask-2',
+        event_id: eventSubtaskTwo,
         event_data: {
           id: 'subtask-2',
           user_id: user.todoistUserId,
           checked: true
         }
       }, {
-        deliveryId: 'delivery-subtask-2'
+        deliveryId: deliverySubtaskTwo
       })
 
       expect(secondResult.response.status).toBe(200)
