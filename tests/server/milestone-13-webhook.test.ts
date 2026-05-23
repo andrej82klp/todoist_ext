@@ -24,9 +24,13 @@ const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 let server: ReturnType<typeof createServer>
 let baseUrl = ''
 // Helper: produce the HMAC signature expected by the webhook handler.
-// Uses the same client secret value the test sets in `TODOIST_CLIENT_SECRET`.
+// Uses the same secret resolution policy as the webhook service.
+// If `TODOIST_WEBHOOK_SECRET` is set, it takes precedence; otherwise we fall
+// back to `TODOIST_CLIENT_SECRET`.
 function signPayload(payload: string) {
-  const secret = process.env.TODOIST_CLIENT_SECRET ?? 'milestone-13-test-client-secret'
+  const secret = process.env.TODOIST_WEBHOOK_SECRET
+    ?? process.env.TODOIST_CLIENT_SECRET
+    ?? 'milestone-13-test-client-secret'
   return createHmac('sha256', secret).update(payload).digest('base64')
 }
 
@@ -58,7 +62,10 @@ async function sendWebhook(payload: Record<string, unknown>, options: { delivery
 // Setup: starts a local server and configures secrets used to validate webhook signatures.
 // Tests use `signPayload` to generate expected HMACs for the payloads they post.
 beforeAll(async () => {
-  process.env.TODOIST_CLIENT_SECRET ||= 'milestone-13-test-client-secret'
+  // Keep both env vars aligned so signature checks stay deterministic even when
+  // local dotenv files define both values differently.
+  process.env.TODOIST_CLIENT_SECRET = 'milestone-13-test-client-secret'
+  process.env.TODOIST_WEBHOOK_SECRET = process.env.TODOIST_CLIENT_SECRET
 
   const app = createApp()
   const router = createRouter()
@@ -111,6 +118,11 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
     const db = getDb()
     // Get DB handle for creating test entities and querying results.
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const eventSubtaskOne = `evt-subtask-1-${suffix}`
+    const eventSubtaskTwo = `evt-subtask-2-${suffix}`
+    const deliverySubtaskOne = `delivery-subtask-1-${suffix}`
+    const deliverySubtaskOneDuplicate = `delivery-subtask-1-duplicate-${suffix}`
+    const deliverySubtaskTwo = `delivery-subtask-2-${suffix}`
 
     // Create an isolated test user with a unique `todoistUserId`.
     const [user] = await db.insert(users).values({
@@ -194,14 +206,14 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // The webhook includes an explicit `event_id` which is used for idempotency.
       const firstResult = await sendWebhook({
         event_name: 'item:completed',
-        event_id: 'evt-subtask-1',
+        event_id: eventSubtaskOne,
         event_data: {
           id: 'subtask-1',
           user_id: user.todoistUserId,
           checked: true
         }
       }, {
-        deliveryId: 'delivery-subtask-1'
+        deliveryId: deliverySubtaskOne
       })
 
       expect(firstResult.response.status).toBe(200)
@@ -211,14 +223,14 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // The system should detect the duplicate and NOT award points twice.
       const duplicateResult = await sendWebhook({
         event_name: 'item:completed',
-        event_id: 'evt-subtask-1',
+        event_id: eventSubtaskOne,
         event_data: {
           id: 'subtask-1',
           user_id: user.todoistUserId,
           checked: true
         }
       }, {
-        deliveryId: 'delivery-subtask-1-duplicate'
+        deliveryId: deliverySubtaskOneDuplicate
       })
 
       expect(duplicateResult.response.status).toBe(200)
@@ -228,14 +240,14 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // task should be marked complete and the configured task completion bonus applied.
       const secondResult = await sendWebhook({
         event_name: 'item:completed',
-        event_id: 'evt-subtask-2',
+        event_id: eventSubtaskTwo,
         event_data: {
           id: 'subtask-2',
           user_id: user.todoistUserId,
           checked: true
         }
       }, {
-        deliveryId: 'delivery-subtask-2'
+        deliveryId: deliverySubtaskTwo
       })
 
       expect(secondResult.response.status).toBe(200)

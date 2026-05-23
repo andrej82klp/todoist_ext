@@ -41,6 +41,17 @@ export interface ProcessTodoistWebhookInput {
   deliveryKey: string
 }
 
+/**
+ * Resolves the shared secret used to validate Todoist webhook signatures.
+ *
+ * Behavior:
+ * - Uses `TODOIST_WEBHOOK_SECRET` when provided.
+ * - Falls back to `TODOIST_CLIENT_SECRET` for backwards compatibility.
+ * - Throws a bad request error when neither secret exists.
+ *
+ * Use this helper wherever signature verification is performed so all
+ * webhook entry points use the same secret resolution policy.
+ */
 function getWebhookSecret() {
   const webhookSecret = process.env.TODOIST_WEBHOOK_SECRET
 
@@ -57,6 +68,13 @@ function getWebhookSecret() {
   return clientSecret
 }
 
+/**
+ * Compares two signature strings in constant time.
+ *
+ * This guards against timing attacks when validating untrusted signatures.
+ * Returns `false` immediately for mismatched lengths because
+ * `timingSafeEqual` requires equal-sized buffers.
+ */
 function safeCompare(left: string, right: string) {
   const leftBuffer = Buffer.from(left)
   const rightBuffer = Buffer.from(right)
@@ -68,6 +86,13 @@ function safeCompare(left: string, right: string) {
   return timingSafeEqual(leftBuffer, rightBuffer)
 }
 
+/**
+ * Normalizes an inbound signature value from HTTP headers.
+ *
+ * Some providers prefix signatures with `sha256=` while others return only
+ * the digest. This helper accepts both formats and returns the digest-only
+ * representation expected by internal comparison logic.
+ */
 function normalizeSignature(signature: string) {
   const trimmed = signature.trim()
 
@@ -78,6 +103,12 @@ function normalizeSignature(signature: string) {
   return trimmed
 }
 
+/**
+ * Converts supported identifier values into canonical string IDs.
+ *
+ * Accepts non-empty strings and finite numbers. Returns `null` for all other
+ * values so callers can treat missing or invalid identifiers uniformly.
+ */
 function toStringId(value: unknown): string | null {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value.trim()
@@ -90,6 +121,12 @@ function toStringId(value: unknown): string | null {
   return null
 }
 
+/**
+ * Projects a task row into the minimal metadata expected by the points engine.
+ *
+ * Keep this adapter in sync with `calculateTaskPoints` inputs so task-scoring
+ * logic remains decoupled from repository row shapes.
+ */
 function rowToTaskMetadata(row: TaskWithMetaRow) {
   return {
     priority: row.priority,
@@ -102,6 +139,12 @@ function rowToTaskMetadata(row: TaskWithMetaRow) {
   }
 }
 
+/**
+ * Parses and validates the raw webhook JSON body.
+ *
+ * Throws a bad request error when the payload is malformed or not an object.
+ * This gives callers a normalized failure mode for invalid webhook content.
+ */
 function parsePayload(rawBody: string): TodoistWebhookPayload {
   try {
     const payload = JSON.parse(rawBody)
@@ -116,18 +159,38 @@ function parsePayload(rawBody: string): TodoistWebhookPayload {
   }
 }
 
+/**
+ * Reads the event name from a webhook payload with a safe fallback.
+ *
+ * Returns `unknown` when the field is absent to avoid propagating `undefined`
+ * into idempotency keys and observability fields.
+ */
 function extractEventName(payload: TodoistWebhookPayload): string {
   return typeof payload.event_name === 'string'
     ? payload.event_name
     : 'unknown'
 }
 
+/**
+ * Extracts the Todoist item identifier from supported payload variants.
+ *
+ * Todoist webhook payloads can place the item ID in different locations
+ * depending on event type. This helper checks known locations in priority
+ * order and returns `null` if no usable value is found.
+ */
 function extractItemId(payload: TodoistWebhookPayload): string | null {
   return toStringId(payload.event_data?.id)
     ?? toStringId(payload.event_data?.item_id)
     ?? toStringId(payload.item_id)
 }
 
+/**
+ * Extracts the Todoist user identifier from supported payload variants.
+ *
+ * User IDs can appear on event data, top-level fields, or initiator fields.
+ * This function centralizes that lookup so user resolution behavior is
+ * consistent across all webhook processing paths.
+ */
 function extractTodoistUserId(payload: TodoistWebhookPayload): string | null {
   return toStringId(payload.event_data?.user_id)
     ?? toStringId(payload.user_id)
@@ -135,6 +198,14 @@ function extractTodoistUserId(payload: TodoistWebhookPayload): string | null {
     ?? toStringId(payload.initiator_id)
 }
 
+/**
+ * Builds a stable idempotency key seed for a webhook event.
+ *
+ * Prefers Todoist's explicit `event_id` when available. Otherwise constructs a
+ * deterministic composite key from event name, user ID, item ID, and a caller
+ * supplied fallback source (typically a payload hash). This ensures retries and
+ * duplicate deliveries map to the same event identity.
+ */
 function buildEventKey(payload: TodoistWebhookPayload, fallbackSource: string) {
   const explicitEventId = toStringId(payload.event_id)
 
@@ -149,6 +220,12 @@ function buildEventKey(payload: TodoistWebhookPayload, fallbackSource: string) {
   return `${eventName}:${userId}:${itemId}:${fallbackSource}`
 }
 
+/**
+ * Chooses the activity date used for streak accounting.
+ *
+ * Uses the date portion of `triggered_at` when present; otherwise falls back to
+ * the current UTC date. Returned format is `YYYY-MM-DD`.
+ */
 function extractActivityDate(payload: TodoistWebhookPayload): string {
   if (typeof payload.triggered_at === 'string' && payload.triggered_at.length >= 10) {
     return payload.triggered_at.slice(0, 10)
@@ -156,6 +233,12 @@ function extractActivityDate(payload: TodoistWebhookPayload): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+/**
+ * Determines whether a webhook should be treated as a completion event.
+ *
+ * Supports explicit completion event names and the legacy `checked: true`
+ * signal for compatibility with different Todoist payload versions.
+ */
 function isCompletionEvent(payload: TodoistWebhookPayload): boolean {
   const eventName = extractEventName(payload)
 
@@ -166,6 +249,18 @@ function isCompletionEvent(payload: TodoistWebhookPayload): boolean {
   return payload.event_data?.checked === true
 }
 
+/**
+ * Handles points and bonus processing for a completed subtask.
+ *
+ * Workflow:
+ * - Loads user settings and subtask metadata.
+ * - Awards subtask points idempotently in the ledger.
+ * - If all sibling subtasks are complete, marks parent as complete.
+ * - If parent completion bonus is enabled, awards bonus idempotently.
+ *
+ * This helper must execute inside an existing transaction to keep task mapping,
+ * ledger writes, and completion state changes atomic.
+ */
 async function processSubtaskCompletion(
   tx: DatabaseClient,
   userId: string,
@@ -248,6 +343,13 @@ async function processSubtaskCompletion(
 }
 
 export const todoistWebhookService = {
+  /**
+   * Verifies that a webhook signature matches the raw request body.
+   *
+   * Call this before processing payload data. Returns `false` when the
+   * signature header is missing or invalid, allowing callers to reject the
+   * request with an authorization/signature error.
+   */
   verifySignature(rawBody: string, signature: string | null) {
     if (!signature) {
       return false
@@ -260,10 +362,31 @@ export const todoistWebhookService = {
     return safeCompare(expectedSignature, normalizeSignature(signature))
   },
 
+  /**
+   * Generates a deterministic fallback delivery key from raw payload content.
+   *
+   * Useful when upstream delivery IDs are unavailable. The hash should be used
+   * only as a fallback deduplication key, not as a security primitive.
+   */
   buildFallbackDeliveryKey(rawBody: string) {
     return createHash('sha256').update(rawBody).digest('hex')
   },
 
+  /**
+   * Main webhook processing pipeline for Todoist completion events.
+   *
+   * Responsibilities:
+   * - Parse payload and derive deterministic event identity.
+   * - Ignore non-completion or malformed events while recording delivery status.
+   * - Resolve local user from Todoist user ID.
+   * - Pre-catch-up streak history through yesterday.
+   * - Process mapped task/subtask completion inside a DB transaction.
+   * - Award points/bonuses (subtasks), update streak aggregates, and mark
+   *   webhook delivery state for idempotent retries.
+   *
+   * This method is safe to call multiple times for the same delivery because
+   * webhook delivery records and idempotent ledger writes prevent double-credit.
+   */
   async processCompletionWebhook(input: ProcessTodoistWebhookInput) {
     const payload = parsePayload(input.rawBody)
     const payloadFingerprint = createHash('sha256').update(input.rawBody).digest('hex')
