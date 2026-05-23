@@ -24,9 +24,13 @@ const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 let server: ReturnType<typeof createServer>
 let baseUrl = ''
 // Helper: produce the HMAC signature expected by the webhook handler.
-// Uses the same client secret value the test sets in `TODOIST_CLIENT_SECRET`.
+// Uses the same secret resolution policy as the webhook service.
+// If `TODOIST_WEBHOOK_SECRET` is set, it takes precedence; otherwise we fall
+// back to `TODOIST_CLIENT_SECRET`.
 function signPayload(payload: string) {
-  const secret = process.env.TODOIST_CLIENT_SECRET ?? 'milestone-13-test-client-secret'
+  const secret = process.env.TODOIST_WEBHOOK_SECRET
+    ?? process.env.TODOIST_CLIENT_SECRET
+    ?? 'milestone-13-test-client-secret'
   return createHmac('sha256', secret).update(payload).digest('base64')
 }
 
@@ -58,7 +62,10 @@ async function sendWebhook(payload: Record<string, unknown>, options: { delivery
 // Setup: starts a local server and configures secrets used to validate webhook signatures.
 // Tests use `signPayload` to generate expected HMACs for the payloads they post.
 beforeAll(async () => {
-  process.env.TODOIST_CLIENT_SECRET ||= 'milestone-13-test-client-secret'
+  // Keep both env vars aligned so signature checks stay deterministic even when
+  // local dotenv files define both values differently.
+  process.env.TODOIST_CLIENT_SECRET = 'milestone-13-test-client-secret'
+  process.env.TODOIST_WEBHOOK_SECRET = process.env.TODOIST_CLIENT_SECRET
 
   const app = createApp()
   const router = createRouter()
