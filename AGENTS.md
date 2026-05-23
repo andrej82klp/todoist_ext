@@ -21,6 +21,16 @@ Key places to look
 - Shared types and schemas: `shared/` (types, schemas, constants).
 - Docs: `docs/` for design, API spec, and plans.
 
+Instruction files to honor
+- API route conventions: `.github/instructions/server-api-routes.instructions.md` (applies to `server/api/**/*.ts`).
+- CI pipeline conventions: `.github/instructions/ci-pipeline.instructions.md` (applies to `.github/workflows/**/*.yml`).
+- Local CI validation checks: `.github/instructions/ci-validation.instructions.md` (applies to app/server/shared/tests/scripts source files).
+- DB safety checks: `.github/instructions/db-safety.instructions.md` (applies to schema, repository, and DB script files).
+- Route handlers should use `defineApiHandler`, `requireCurrentUser` where auth is needed, Zod validation via shared schemas, and response helpers from `server/utils/api.ts`.
+
+Skills to use
+- Contract/regression test execution helper: `.agents/skills/contract-test-runner/SKILL.md`.
+
 Common tasks and where to start
 - Implement an API route: follow patterns in `server/api/*/*.ts` and reference `shared/schemas` for request/response contracts.
 - Add a DB migration: update `drizzle/` SQL or use `drizzle-kit` commands; keep tests deterministic.
@@ -49,9 +59,6 @@ Useful links
 - Repo README: [README.md](README.md)
 - Server README: [server/README.md](server/README.md)
 - Docs directory: [docs/](docs/)
-
-Proposals for additional agent customizations
-- Create a CI-focused instruction that documents expected pipeline steps and test targets.
-- Add a small `agent-skill` describing how to run and validate contract tests locally.
-
-If you want, I can update or expand this into `.github/copilot-instructions.md` or split per area (frontend/backend/tests).
+- API spec: [docs/API-endpoint-specification.md](docs/API-endpoint-specification.md)
+- Architecture: [docs/Technical-Architecture.md](docs/Technical-Architecture.md)
+- Contract test reference: [tests/server/milestone-3-contracts.test.ts](tests/server/milestone-3-contracts.test.ts)
