@@ -1,88 +1,47 @@
 # Todoist Gamification Companion App
 
-Nuxt 4 full-stack companion app for Todoist. Todoist remains the source of truth for projects, tasks, and completion state; this app owns only gamification data such as metadata, rewards, points, streaks, and settings.
+A Nuxt 4 full-stack companion app for Todoist.
 
-## Milestone 1 Status
+Todoist remains the source of truth for projects, tasks, and completion state. This app manages gamification-specific data and behavior, including metadata, points, rewards, streaks, analytics, and user settings.
 
-The repository now includes:
+## Features
 
-- Nuxt 4 app scaffold using Nuxt UI
-- Base application layout with dashboard, tasks, rewards, and settings navigation
-- Placeholder pages for the MVP routes
-- Server and shared directory skeleton for the modular monolith architecture
-- Documented environment variables for future Todoist, session, and database work
+- Nuxt 4 application with server API routes
+- Postgres data layer with Drizzle ORM
+- Shared TypeScript and Zod contracts across client and server
+- Reward and ledger domain modeling
+- Streaks and analytics support
+- Session and auth-related server utilities
 
-## Milestone 2 Status
+## Tech Stack
 
-The repository now also includes:
+- Nuxt 4
+- TypeScript
+- Drizzle ORM + PostgreSQL
+- Zod
+- Vitest and Playwright
 
-- Drizzle ORM and migration tooling wired to `DATABASE_URL`
-- Typed Postgres schema for users, Todoist mappings, metadata, settings, rewards, ledger, streaks, notifications, and webhook deliveries
-- Repository helpers for users, settings defaults, rewards, and ledger records
-- Seed and smoke-test scripts for the initial database slice
+## Prerequisites
 
-## Milestone 3 Status
-
-The repository now also includes:
-
-- Shared DTOs, enums, response envelopes, and error contracts under `shared/`
-- Zod validation schemas for task metadata, rewards, settings, ledger adjustments, and pagination/sorting inputs
-- Reusable server response and validation helpers
-- Contract tests for success, collection, action, and `422` validation responses
-
-## Milestone 4 Status
-
-The repository now also includes:
-
-- Encrypted app-session cookie utilities and current-user resolution helpers
-- `GET /api/auth/session` and `POST /api/auth/logout`
-- A dev/test-only session simulation route for local auth-state verification
-- Layout-level authenticated and unauthenticated shell states with a Todoist connect placeholder
-- Focused session tests covering unauthenticated, protected, authenticated, and logout flows
+- Node.js 20+
+- pnpm 10+
+- PostgreSQL database (Neon or local)
 
 ## Setup
 
-Install dependencies:
+1. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-Create a local environment file:
+2. Create your local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Start the development server:
-
-```bash
-pnpm dev
-```
-
-Apply the database migration:
-
-```bash
-pnpm db:migrate
-```
-
-Seed a development user with default settings and milestone rows:
-
-```bash
-pnpm db:seed
-```
-
-Run checks:
-
-```bash
-pnpm lint
-pnpm typecheck
-pnpm db:smoke
-```
-
-## Environment Variables
-
-The following variables are reserved for the next milestones:
+3. Configure required environment variables in `.env`:
 
 - `DATABASE_URL`
 - `TODOIST_CLIENT_ID`
@@ -91,40 +50,90 @@ The following variables are reserved for the next milestones:
 - `TODOIST_WEBHOOK_SECRET`
 - `SESSION_SECRET`
 
-`DATABASE_URL` should point to a Neon or local Postgres instance before running `pnpm db:migrate`, `pnpm db:seed`, or `pnpm db:smoke`.
+4. Run database migrations:
 
-See `.env.example` for placeholders and descriptions.
+```bash
+pnpm db:migrate
+```
+
+5. Seed development data:
+
+```bash
+pnpm db:seed
+```
+
+## Running the Application
+
+Start the app in development mode:
+
+```bash
+pnpm dev
+```
+
+Build for production:
+
+```bash
+pnpm build
+```
+
+Preview the production build locally:
+
+```bash
+pnpm preview
+```
+
+## Quality Checks
+
+Run linting:
+
+```bash
+pnpm lint
+```
+
+Run type checks:
+
+```bash
+pnpm typecheck
+```
+
+Run database smoke tests:
+
+```bash
+pnpm db:smoke
+```
+
+Run end-to-end tests:
+
+```bash
+pnpm test:e2e
+```
+
+## Available Scripts
+
+- `pnpm dev` - Start Nuxt in development mode
+- `pnpm build` - Build production bundle
+- `pnpm preview` - Preview production build
+- `pnpm db:generate` - Generate Drizzle migrations
+- `pnpm db:migrate` - Apply migrations
+- `pnpm db:seed` - Seed development data
+- `pnpm db:smoke` - Run DB smoke tests
+- `pnpm lint` - Run ESLint
+- `pnpm typecheck` - Run Nuxt type checks
+- `pnpm test:e2e` - Run Playwright E2E tests
 
 ## Project Structure
 
 ```text
-app/
-  components/
-  layouts/
-  pages/
-
-server/
-  api/
-  services/
-  repositories/
-  utils/
-  middleware/
-  db/
-
-shared/
-  types/
-  constants/
-  schemas/
+app/                  # Frontend pages, layouts, and components
+server/               # API routes, services, repositories, and DB access
+shared/               # Shared types, constants, and validation schemas
+tests/                # Server, DB, and E2E tests
+drizzle/              # SQL migrations and metadata snapshots
+scripts/              # Utility scripts (for example, database seeding)
+docs/                 # Product and architecture documentation
 ```
 
-## Current Scope
+## Documentation
 
-This first implementation slice does not yet include:
-
-- database connectivity
-- Todoist OAuth
-- Todoist sync
-- API business logic
-- points or rewards logic
-
-Milestone 2 adds the database foundation only. Todoist integration, session auth, scoring logic, and business APIs still land in later milestones.
+- See `docs/` for product, architecture, and API-related documents.
+- See `server/README.md` for server-specific details.
