@@ -14,6 +14,15 @@ export interface UpsertTodoistOauthAccountInput {
   tokenExpiresAt?: Date | null
 }
 
+export interface DecryptedTodoistCredentials {
+  providerUserId: string
+  accessToken: string
+  refreshToken: string | null
+  scope: string | null
+  tokenType: string | null
+  tokenExpiresAt: Date | null
+}
+
 export const oauthAccountsRepository = {
   async upsertTodoistAccount(input: UpsertTodoistOauthAccountInput) {
     const db = getDb()
@@ -63,5 +72,22 @@ export const oauthAccountsRepository = {
     const record = await this.findTodoistAccountByUserId(userId)
     if (!record) return null
     return decryptSecret(record.accessToken)
+  },
+
+  async getDecryptedTodoistCredentials(userId: string): Promise<DecryptedTodoistCredentials | null> {
+    const record = await this.findTodoistAccountByUserId(userId)
+
+    if (!record) {
+      return null
+    }
+
+    return {
+      providerUserId: record.providerUserId,
+      accessToken: decryptSecret(record.accessToken),
+      refreshToken: record.refreshToken ? decryptSecret(record.refreshToken) : null,
+      scope: record.scope,
+      tokenType: record.tokenType,
+      tokenExpiresAt: record.tokenExpiresAt
+    }
   }
 }
