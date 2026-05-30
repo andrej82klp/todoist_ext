@@ -192,7 +192,7 @@ describe('Milestone 6 — Todoist sync API client', () => {
     try {
       await expect(fetchAllTodoistProjects('bad-token')).rejects.toMatchObject({
         name: 'ApiHttpError',
-        statusCode: 500
+        statusCode: 401
       })
     } finally {
       globalThis.fetch = originalFetch

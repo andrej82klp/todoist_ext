@@ -210,6 +210,8 @@ type TaskListResponse = ApiCollectionResponse<EnrichedTask, TaskListMeta>
 const listEnvelope = ref<TaskListResponse | null>(null)
 const listPending = ref(false)
 const listError = ref<Error | null>(null)
+const syncPending = ref(false)
+const syncError = ref('')
 
 async function refreshList() {
   listPending.value = true
@@ -224,6 +226,24 @@ async function refreshList() {
     listError.value = new Error(parseApiErrorMessage(fetchError, 'Could not load tasks'))
   } finally {
     listPending.value = false
+  }
+}
+
+async function resyncFromTodoist() {
+  syncPending.value = true
+  syncError.value = ''
+
+  try {
+    await $fetch('/api/todoist/sync', {
+      method: 'POST',
+      credentials: 'include'
+    })
+
+    await refreshList()
+  } catch (fetchError: unknown) {
+    syncError.value = parseApiErrorMessage(fetchError, 'Could not sync Todoist data')
+  } finally {
+    syncPending.value = false
   }
 }
 
@@ -475,16 +495,38 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
 <template>
   <div class="space-y-8">
     <section class="space-y-2">
-      <p class="text-xs font-semibold tracking-[0.2em] uppercase text-primary">
-        Task planning
-      </p>
-      <h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-        Tasks
-      </h1>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="space-y-2">
+          <p class="text-xs font-semibold tracking-[0.2em] uppercase text-primary">
+            Task planning
+          </p>
+          <h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
+            Tasks
+          </h1>
+        </div>
+
+        <UButton
+          label="Re-sync from Todoist"
+          icon="i-lucide-refresh-cw"
+          color="neutral"
+          variant="outline"
+          :loading="syncPending"
+          :disabled="syncPending"
+          @click="resyncFromTodoist"
+        />
+      </div>
       <p class="max-w-3xl text-base leading-7 text-toned">
         Browse synced Todoist work, tune metadata, and use estimated points plus progress signals to decide what to tackle next.
       </p>
     </section>
+
+    <UAlert
+      v-if="syncError"
+      color="error"
+      variant="subtle"
+      title="Could not sync Todoist"
+      :description="syncError"
+    />
 
     <UCard class="border-default/70 bg-background/80 shadow-sm">
       <div class="grid gap-4 lg:grid-cols-[minmax(200px,1fr)_minmax(170px,220px)_minmax(170px,220px)_auto]">

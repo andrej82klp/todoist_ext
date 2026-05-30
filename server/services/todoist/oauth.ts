@@ -78,6 +78,32 @@ export async function exchangeTodoistAuthorizationCode(code: string) {
   return todoistTokenSchema.parse(payload)
 }
 
+export async function refreshTodoistAccessToken(refreshToken: string) {
+  const body = new URLSearchParams({
+    client_id: getEnvValue('TODOIST_CLIENT_ID'),
+    client_secret: getEnvValue('TODOIST_CLIENT_SECRET'),
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken
+  })
+
+  const response = await fetch(TODOIST_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded'
+    },
+    body
+  })
+
+  if (!response.ok) {
+    throw badRequestError('Failed to refresh Todoist access token', {
+      status: response.status
+    })
+  }
+
+  const payload = await response.json()
+  return todoistTokenSchema.parse(payload)
+}
+
 export interface TodoistUserProfile {
   todoistUserId: string
   email: string
