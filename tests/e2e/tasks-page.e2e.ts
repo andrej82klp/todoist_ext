@@ -106,6 +106,8 @@ test.describe('Tasks page', () => {
       await page.goto('/tasks')
 
       await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: 'Priority' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: 'Difficulty' })).toBeVisible()
       await expect(page.getByTestId('tasks-project-filter')).toContainText('Alpha')
       await expect(page.getByTestId('tasks-project-filter')).toContainText('Beta')
 
@@ -115,8 +117,6 @@ test.describe('Tasks page', () => {
       await expect(page.locator('[data-testid="task-row-task-alpha"]:visible')).toHaveCount(0)
 
       await page.selectOption('[data-testid="tasks-project-filter"]', '')
-      await page.selectOption('[data-testid="tasks-sort-by"]', 'difficulty')
-      await page.selectOption('[data-testid="tasks-sort-order"]', 'asc')
       await expect(page.locator('[data-testid^="task-row-"]:visible').first()).toHaveAttribute('data-testid', 'task-row-task-beta')
 
       await expect(page.getByText('No subtasks').first()).toBeVisible()
