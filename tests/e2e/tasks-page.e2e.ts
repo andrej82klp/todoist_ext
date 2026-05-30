@@ -106,6 +106,8 @@ test.describe('Tasks page', () => {
       await page.goto('/tasks')
 
       await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: 'Priority' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: 'Difficulty' })).toBeVisible()
       await expect(page.getByTestId('tasks-project-filter')).toContainText('Alpha')
       await expect(page.getByTestId('tasks-project-filter')).toContainText('Beta')
 

@@ -128,6 +128,6 @@ describe('Milestone 3 error normalization helpers', () => {
   })
 
   it('keeps the sorting allowlist explicit and shared', () => {
-    expect(TASK_SORT_FIELDS).toEqual(['priority', 'difficulty', 'estimatedPoints', 'deadline'])
+    expect(TASK_SORT_FIELDS).toEqual(['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'])
   })
 })
