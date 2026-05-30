@@ -372,6 +372,41 @@ describe('Milestone 7 — task list and metadata API', () => {
     }
   })
 
+  runIfDatabaseConfigured('GET /api/tasks sorts by task title desc', async () => {
+    const db = getDb()
+    const [user] = await db.insert(users).values({
+      email: 'tasks-sort-title@example.com',
+      todoistUserId: 'tasks-todoist-sort-title'
+    }).returning()
+
+    try {
+      await ensureUserDefaults(user.id)
+
+      await itemMappingsRepository.upsertMany(user.id, [
+        { todoistItemId: 'task-alpha', itemType: 'task', title: 'Alpha Task' },
+        { todoistItemId: 'task-zulu', itemType: 'task', title: 'Zulu Task' }
+      ])
+
+      const sessionRes = await fetch(`${baseUrl}/api/internal/test-auth/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      })
+      const sessionCookie = sessionRes.headers.get('set-cookie')?.split(';')[0] ?? ''
+
+      const res = await fetch(`${baseUrl}/api/tasks?sortBy=task&sortOrder=desc`, {
+        headers: authHeader(sessionCookie)
+      })
+      const payload = await res.json()
+
+      expect(res.status).toBe(200)
+      expect(payload.data[0].todoistTaskId).toBe('task-zulu')
+      expect(payload.data[1].todoistTaskId).toBe('task-alpha')
+    } finally {
+      await db.delete(users).where(eq(users.id, user.id))
+    }
+  })
+
   runIfDatabaseConfigured('GET /api/tasks/:taskId returns task with subtasks', async () => {
     const db = getDb()
     const [user] = await db.insert(users).values({

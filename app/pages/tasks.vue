@@ -9,7 +9,7 @@ import type {
   TodoistTaskMetadata
 } from '../../shared/types'
 
-type SortByValue = 'none' | 'priority' | 'difficulty' | 'estimatedPoints' | 'deadline'
+type SortByValue = 'none' | 'task' | 'priority' | 'difficulty' | 'estimatedPoints' | 'deadline'
 
 interface ParsedTaskRouteQuery {
   projectId: string
@@ -66,19 +66,6 @@ const metadataCustomOverrideInput = computed({
   }
 })
 
-const sortByOptions = [
-  { value: 'none', label: 'Default order' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'difficulty', label: 'Difficulty' },
-  { value: 'estimatedPoints', label: 'Estimated points' },
-  { value: 'deadline', label: 'Deadline' }
-]
-
-const sortOrderOptions = [
-  { value: 'asc', label: 'Ascending' },
-  { value: 'desc', label: 'Descending' }
-]
-
 const priorityOptions = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
@@ -103,7 +90,7 @@ function parseRouteQuery(query: Record<string, unknown>): ParsedTaskRouteQuery {
 
   return {
     projectId: asQueryValue(query.projectId) ?? '',
-    sortBy: sortBy && ['priority', 'difficulty', 'estimatedPoints', 'deadline'].includes(sortBy)
+    sortBy: sortBy && ['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'].includes(sortBy)
       ? (sortBy as SortByValue)
       : 'none',
     sortOrder: sortOrder === 'desc' ? 'desc' : 'asc',
@@ -121,7 +108,7 @@ function normalizeRouteQuery(query: Record<string, unknown>) {
   const pageValue = asQueryValue(query.page)
 
   if (projectId) normalized.projectId = projectId
-  if (sortBy && ['priority', 'difficulty', 'estimatedPoints', 'deadline'].includes(sortBy)) {
+  if (sortBy && ['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'].includes(sortBy)) {
     normalized.sortBy = sortBy
   }
   if (normalized.sortBy && sortOrder === 'desc') {
@@ -449,6 +436,40 @@ function deadlineColor(task: EnrichedTask) {
   if (!task.deadline) return 'neutral'
   return task.isDeadlineApproaching ? 'error' : 'primary'
 }
+
+const sortableColumns: Array<{ value: Exclude<SortByValue, 'none'>, label: string, align?: 'left' | 'right' }> = [
+  { value: 'task', label: 'Task' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'difficulty', label: 'Difficulty' },
+  { value: 'estimatedPoints', label: 'Estimated points' },
+  { value: 'deadline', label: 'Deadline' }
+]
+
+function sortIcon(sortBy: Exclude<SortByValue, 'none'>) {
+  if (selectedSortBy.value !== sortBy) {
+    return 'i-lucide-arrow-up-down'
+  }
+
+  return selectedSortOrder.value === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down'
+}
+
+function sortButtonClass(sortBy: Exclude<SortByValue, 'none'>) {
+  return selectedSortBy.value === sortBy ? 'text-highlighted' : 'text-toned hover:text-highlighted'
+}
+
+async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
+  if (selectedSortBy.value === sortBy) {
+    selectedSortOrder.value = selectedSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    selectedSortBy.value = sortBy
+    selectedSortOrder.value = 'asc'
+  }
+
+  currentPage.value = 1
+
+  await syncRouteFromState()
+  await refreshList()
+}
 </script>
 
 <template>
@@ -480,41 +501,6 @@ function deadlineColor(task: EnrichedTask) {
               :value="option.id"
             >
               {{ option.name }}
-            </option>
-          </select>
-        </UFormField>
-
-        <UFormField label="Sort by">
-          <select
-            v-model="selectedSortBy"
-            data-testid="tasks-sort-by"
-            class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm"
-            @change="onListControlsChanged"
-          >
-            <option
-              v-for="option in sortByOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
-        </UFormField>
-
-        <UFormField label="Sort order">
-          <select
-            v-model="selectedSortOrder"
-            data-testid="tasks-sort-order"
-            :disabled="selectedSortBy === 'none'"
-            class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm disabled:opacity-60"
-            @change="onListControlsChanged"
-          >
-            <option
-              v-for="option in sortOrderOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
             </option>
           </select>
         </UFormField>
@@ -607,17 +593,24 @@ function deadlineColor(task: EnrichedTask) {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-default/60 text-left text-toned">
-                <th class="py-3 pr-4 font-medium">
-                  Task
-                </th>
-                <th class="py-3 pr-4 font-medium">
-                  Priority / Difficulty
-                </th>
-                <th class="py-3 pr-4 font-medium">
-                  Estimated points
-                </th>
-                <th class="py-3 pr-4 font-medium">
-                  Deadline
+                <th
+                  v-for="column in sortableColumns"
+                  :key="column.value"
+                  class="py-3 pr-4 font-medium"
+                  :class="column.align === 'right' ? 'text-right' : ''"
+                >
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-2 transition-colors"
+                    :class="sortButtonClass(column.value)"
+                    @click="toggleColumnSort(column.value)"
+                  >
+                    <span>{{ column.label }}</span>
+                    <UIcon
+                      :name="sortIcon(column.value)"
+                      class="h-4 w-4"
+                    />
+                  </button>
                 </th>
                 <th class="py-3 pr-4 font-medium">
                   Progress
@@ -662,6 +655,10 @@ function deadlineColor(task: EnrichedTask) {
                     >
                       {{ task.metadata.priority }}
                     </UBadge>
+                  </div>
+                </td>
+                <td class="py-3 pr-4">
+                  <div class="flex items-center gap-2">
                     <span class="text-toned">Difficulty {{ task.metadata.difficulty }}/10</span>
                   </div>
                 </td>
