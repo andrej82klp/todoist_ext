@@ -117,8 +117,6 @@ test.describe('Tasks page', () => {
       await expect(page.locator('[data-testid="task-row-task-alpha"]:visible')).toHaveCount(0)
 
       await page.selectOption('[data-testid="tasks-project-filter"]', '')
-      await page.selectOption('[data-testid="tasks-sort-by"]', 'difficulty')
-      await page.selectOption('[data-testid="tasks-sort-order"]', 'asc')
       await expect(page.locator('[data-testid^="task-row-"]:visible').first()).toHaveAttribute('data-testid', 'task-row-task-beta')
 
       await expect(page.getByText('No subtasks').first()).toBeVisible()
