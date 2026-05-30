@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { internalServerError } from '../../utils/api'
+import { internalServerError, unauthorizedError } from '../../utils/api'
 
 const TODOIST_PROJECTS_URL = 'https://api.todoist.com/api/v1/projects'
 const TODOIST_TASKS_URL = 'https://api.todoist.com/api/v1/tasks'
@@ -54,6 +54,14 @@ async function fetchPaginated<T>(
     })
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw unauthorizedError('Todoist authorization failed', {
+          status: response.status,
+          statusText: response.statusText,
+          url
+        })
+      }
+
       throw internalServerError(`Todoist API request failed: ${url}`, {
         status: response.status,
         statusText: response.statusText
