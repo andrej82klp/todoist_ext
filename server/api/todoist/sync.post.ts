@@ -30,6 +30,9 @@ export default defineApiHandler(async (event) => {
     const refreshedToken = await refreshTodoistAccessToken(credentials.refreshToken)
     const nextRefreshToken = refreshedToken.refresh_token ?? credentials.refreshToken
 
+    const tokenExpiresAt = refreshedToken.expires_in
+      ? new Date(Date.now() + refreshedToken.expires_in * 1000)
+      : credentials.tokenExpiresAt
     await oauthAccountsRepository.upsertTodoistAccount({
       userId: user.id,
       providerUserId: credentials.providerUserId,
@@ -37,18 +40,13 @@ export default defineApiHandler(async (event) => {
       refreshToken: nextRefreshToken,
       scope: refreshedToken.scope ?? credentials.scope,
       tokenType: refreshedToken.token_type ?? credentials.tokenType,
-      tokenExpiresAt: refreshedToken.expires_in
-        ? new Date(Date.now() + refreshedToken.expires_in * 1000)
-        : credentials.tokenExpiresAt
+      tokenExpiresAt
     })
-
     credentials.accessToken = refreshedToken.access_token
     credentials.refreshToken = nextRefreshToken
     credentials.scope = refreshedToken.scope ?? credentials.scope
     credentials.tokenType = refreshedToken.token_type ?? credentials.tokenType
-    credentials.tokenExpiresAt = refreshedToken.expires_in
-      ? new Date(Date.now() + refreshedToken.expires_in * 1000)
-      : credentials.tokenExpiresAt
+    credentials.tokenExpiresAt = tokenExpiresAt
 
     return credentials.accessToken
   }
