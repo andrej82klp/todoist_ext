@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GlobalSettingsResponse } from '../../shared/types'
+import type { GlobalSettingsResponse } from '#shared/types'
 
 const { data: envelope, pending, error, refresh } = await useFetch<{ data: GlobalSettingsResponse }>('/api/settings', {
   credentials: 'include'

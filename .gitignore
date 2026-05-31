@@ -32,3 +32,4 @@ ignore
 playwright-report/
 test-results/
 playwright/.auth/
+.devcontainer/.deploykey/

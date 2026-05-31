@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { TASK_SORT_FIELDS } from '#shared/constants/api'
+
 import type {
   ApiCollectionResponse,
   ApiErrorResponse,
@@ -7,7 +9,7 @@ import type {
   EnrichedTaskDetail,
   TaskListMeta,
   TodoistTaskMetadata
-} from '../../shared/types'
+} from '#shared/types'
 
 type SortByValue = 'none' | 'task' | 'priority' | 'difficulty' | 'estimatedPoints' | 'deadline'
 
@@ -90,7 +92,7 @@ function parseRouteQuery(query: Record<string, unknown>): ParsedTaskRouteQuery {
 
   return {
     projectId: asQueryValue(query.projectId) ?? '',
-    sortBy: sortBy && ['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'].includes(sortBy)
+    sortBy: sortBy && (TASK_SORT_FIELDS as readonly string[]).includes(sortBy)
       ? (sortBy as SortByValue)
       : 'none',
     sortOrder: sortOrder === 'desc' ? 'desc' : 'asc',
@@ -108,7 +110,7 @@ function normalizeRouteQuery(query: Record<string, unknown>) {
   const pageValue = asQueryValue(query.page)
 
   if (projectId) normalized.projectId = projectId
-  if (sortBy && ['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'].includes(sortBy)) {
+  if (sortBy && (TASK_SORT_FIELDS as readonly string[]).includes(sortBy)) {
     normalized.sortBy = sortBy
   }
   if (normalized.sortBy && sortOrder === 'desc') {
@@ -487,7 +489,6 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
 
   currentPage.value = 1
 
-  await syncRouteFromState()
   await refreshList()
 }
 </script>

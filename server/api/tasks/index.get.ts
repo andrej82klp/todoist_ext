@@ -17,7 +17,7 @@ function sortTasks(tasks: EnrichedTask[], sortBy: TaskSortField, sortOrder: 'asc
     let cmp = 0
     switch (sortBy) {
       case 'task':
-        cmp = a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+        cmp = (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' })
         break
       case 'priority':
         cmp = priorityOrder[a.metadata.priority] - priorityOrder[b.metadata.priority]

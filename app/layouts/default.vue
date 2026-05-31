@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApiSuccessResponse, AuthSessionState } from '../../shared/types'
+import type { ApiSuccessResponse, AuthSessionState } from '#shared/types'
 
 const navigationItems = [
   { label: 'Dashboard', to: '/' },

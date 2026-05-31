@@ -8,7 +8,7 @@ import type {
   LedgerTransaction,
   PointsSummary,
   StreakSummary
-} from '../../shared/types'
+} from '#shared/types'
 
 const acknowledgingId = ref<string | null>(null)
 const acknowledgeError = ref('')
