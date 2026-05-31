@@ -1,17 +1,14 @@
-import { appendFile, mkdir } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
-
 import { getHeader, readRawBody } from 'h3'
 
 import { badRequestError, defineApiHandler, success, tooManyRequestsError, unauthorizedError } from '../../utils/api'
 import { checkRateLimit, createRateLimiter } from '../../utils/rate-limit'
 import { todoistWebhookService } from '../../services/todoist/webhookService'
 import { logger, redactForLog } from '../../utils/logger'
+import { webhookLogsRepository } from '../../repositories/webhook-logs'
 
 // 100 webhook deliveries per IP per minute — generous for Todoist's CDN egress
 // but still guards against replay flooding from a single origin.
 const webhookLimiter = createRateLimiter({ windowMs: 60_000, max: 100 })
-const webhookLogPath = resolve(process.cwd(), 'logs', 'todoist-webhook.log')
 
 function normalizeHeaders(headers: Record<string, string | string[] | undefined>) {
   const normalized: Record<string, string | string[]> = {}
@@ -62,28 +59,23 @@ function toErrorLog(error: unknown) {
   }
 }
 
-async function initializeWebhookLogFile() {
-  await mkdir(dirname(webhookLogPath), { recursive: true })
-  await appendFile(webhookLogPath, '', 'utf8')
-}
-
-void initializeWebhookLogFile().catch((error) => {
-  logger.error('webhook_log_init_failed', {
-    error: toErrorLog(error),
-    path: webhookLogPath
-  })
-})
-
 async function writeWebhookLog(entry: Record<string, unknown>) {
   try {
-    const line = JSON.stringify(redactForLog(entry))
-    // Ensure the logs directory exists in case initialization hasn't completed.
-    await mkdir(dirname(webhookLogPath), { recursive: true })
-    await appendFile(webhookLogPath, `${line}\n`, 'utf8')
+    const redacted = redactForLog(entry) as Record<string, unknown>
+    await webhookLogsRepository.create({
+      loggedAt: new Date(typeof redacted.timestamp === 'string' ? redacted.timestamp : Date.now()),
+      type: typeof redacted.type === 'string' ? redacted.type : 'unknown',
+      method: typeof redacted.method === 'string' ? redacted.method : null,
+      url: typeof redacted.url === 'string' ? redacted.url : null,
+      headers: typeof redacted.headers === 'object' && redacted.headers !== null ? redacted.headers as Record<string, unknown> : null,
+      payload: redacted.payload ?? null,
+      deliveryKey: typeof redacted.deliveryKey === 'string' ? redacted.deliveryKey : null,
+      status: typeof redacted.status === 'string' ? redacted.status : null,
+      error: typeof redacted.error === 'object' && redacted.error !== null ? redacted.error as Record<string, unknown> : null
+    })
   } catch (error) {
-    logger.error('webhook_log_write_failed', {
-      error: toErrorLog(error),
-      path: webhookLogPath
+    logger.error('webhook_db_log_write_failed', {
+      error: toErrorLog(error)
     })
   }
 }
