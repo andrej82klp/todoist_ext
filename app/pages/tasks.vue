@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TASK_SORT_FIELDS } from '#shared/constants/api'
+import { PRIORITY_LEVELS, TASK_SORT_FIELDS } from '#shared/constants/api'
 
 import type {
   ApiCollectionResponse,
@@ -7,11 +7,13 @@ import type {
   ApiSuccessResponse,
   EnrichedTask,
   EnrichedTaskDetail,
+  SubtaskMetadata,
+  TaskGroupMetadata,
   TaskListMeta,
-  TodoistTaskMetadata
+  TaskSubtaskSummary
 } from '#shared/types'
 
-type SortByValue = 'none' | 'task' | 'priority' | 'difficulty' | 'estimatedPoints' | 'deadline'
+type SortByValue = 'none' | 'task' | 'estimatedPoints' | 'deadline'
 
 interface ParsedTaskRouteQuery {
   projectId: string
@@ -42,37 +44,35 @@ const detail = ref<EnrichedTaskDetail | null>(null)
 const savingMetadata = ref(false)
 const saveError = ref('')
 
-const metadataForm = reactive<TodoistTaskMetadata>({
+const metadataForm = reactive<TaskGroupMetadata>({
+  badge: null,
+  completionBonusPoints: 0
+})
+
+// ── Expand/collapse grouped subtask state ────────────────────────────────────
+
+const expandedTaskIds = ref<Set<string>>(new Set())
+const detailsByTaskId = ref<Map<string, EnrichedTaskDetail>>(new Map())
+const detailPendingIds = ref<Set<string>>(new Set())
+const detailErrorIds = ref<Map<string, string>>(new Map())
+
+// ── Subtask metadata editor ──────────────────────────────────────────────────
+
+const subtaskEditorOpen = ref(false)
+const editingSubtaskParentTaskId = ref<string | null>(null)
+const editingSubtaskId = ref<string | null>(null)
+const editingSubtask = ref<TaskSubtaskSummary | null>(null)
+
+const subtaskForm = reactive<SubtaskMetadata>({
   priority: 'medium',
   difficulty: 1,
-  timeEstimateMinutes: null,
-  completionBonusEnabled: true,
-  completionBonusPercent: 10,
-  badge: null,
-  customPointOverride: null
+  timeEstimateMinutes: null
 })
 
-const metadataTimeEstimateInput = computed({
-  get: () => metadataForm.timeEstimateMinutes === null ? '' : String(metadataForm.timeEstimateMinutes),
-  set: (value: string | number) => {
-    const normalized = String(value ?? '').trim()
-    metadataForm.timeEstimateMinutes = normalized.length > 0 ? Number.parseInt(normalized, 10) : null
-  }
-})
+const savingSubtaskMetadata = ref(false)
+const subtaskSaveError = ref('')
 
-const metadataCustomOverrideInput = computed({
-  get: () => metadataForm.customPointOverride === null ? '' : String(metadataForm.customPointOverride),
-  set: (value: string | number) => {
-    const normalized = String(value ?? '').trim()
-    metadataForm.customPointOverride = normalized.length > 0 ? Number.parseInt(normalized, 10) : null
-  }
-})
-
-const priorityOptions = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' }
-]
+const priorityOptions = PRIORITY_LEVELS.map(p => ({ label: p.charAt(0).toUpperCase() + p.slice(1), value: p }))
 
 function asQueryValue(value: unknown): string | undefined {
   if (Array.isArray(value)) {
@@ -304,24 +304,118 @@ async function goToPage(page: number) {
   await refreshList()
 }
 
-function resetMetadataForm(metadata: TodoistTaskMetadata) {
-  metadataForm.priority = metadata.priority
-  metadataForm.difficulty = metadata.difficulty
-  metadataForm.timeEstimateMinutes = metadata.timeEstimateMinutes
-  metadataForm.completionBonusEnabled = metadata.completionBonusEnabled
-  metadataForm.completionBonusPercent = metadata.completionBonusPercent
-  metadataForm.badge = metadata.badge
-  metadataForm.customPointOverride = metadata.customPointOverride
+// ── Inline expand/collapse helpers ──────────────────────────────────────────
+
+async function loadDetailForTask(taskId: string) {
+  if (detailsByTaskId.value.has(taskId)) return
+
+  detailPendingIds.value = new Set([...detailPendingIds.value, taskId])
+  detailErrorIds.value.delete(taskId)
+
+  try {
+    const response = await $fetch<ApiSuccessResponse<EnrichedTaskDetail>>(`/api/tasks/${taskId}`, {
+      credentials: 'include'
+    })
+
+    const next = new Map(detailsByTaskId.value)
+    next.set(taskId, response.data)
+    detailsByTaskId.value = next
+  } catch (fetchError: unknown) {
+    const next = new Map(detailErrorIds.value)
+    next.set(taskId, parseApiErrorMessage(fetchError, 'Could not load subtasks'))
+    detailErrorIds.value = next
+  } finally {
+    const next = new Set(detailPendingIds.value)
+    next.delete(taskId)
+    detailPendingIds.value = next
+  }
 }
 
-watch(
-  () => metadataForm.completionBonusEnabled,
-  (isEnabled) => {
-    if (!isEnabled) {
-      metadataForm.completionBonusPercent = 0
-    }
+async function toggleExpand(task: EnrichedTask) {
+  const id = task.id
+
+  if (expandedTaskIds.value.has(id)) {
+    const next = new Set(expandedTaskIds.value)
+    next.delete(id)
+    expandedTaskIds.value = next
+    return
   }
-)
+
+  const next = new Set(expandedTaskIds.value)
+  next.add(id)
+  expandedTaskIds.value = next
+
+  await loadDetailForTask(id)
+}
+
+function retryDetailLoad(taskId: string) {
+  const next = new Map(detailErrorIds.value)
+  next.delete(taskId)
+  detailErrorIds.value = next
+  void loadDetailForTask(taskId)
+}
+
+// ── Subtask metadata editor helpers ─────────────────────────────────────────
+
+function openSubtaskEditor(parentTaskId: string, subtask: TaskSubtaskSummary) {
+  editingSubtaskParentTaskId.value = parentTaskId
+  editingSubtaskId.value = subtask.id
+  editingSubtask.value = subtask
+  subtaskForm.priority = subtask.metadata.priority
+  subtaskForm.difficulty = subtask.metadata.difficulty
+  subtaskForm.timeEstimateMinutes = subtask.metadata.timeEstimateMinutes
+  subtaskSaveError.value = ''
+  subtaskEditorOpen.value = true
+}
+
+function closeSubtaskEditor() {
+  subtaskEditorOpen.value = false
+  editingSubtaskParentTaskId.value = null
+  editingSubtaskId.value = null
+  editingSubtask.value = null
+  subtaskSaveError.value = ''
+}
+
+async function saveSubtaskMetadata() {
+  if (!editingSubtaskParentTaskId.value || !editingSubtaskId.value) return
+
+  savingSubtaskMetadata.value = true
+  subtaskSaveError.value = ''
+
+  try {
+    await $fetch(`/api/tasks/${editingSubtaskParentTaskId.value}/subtasks/${editingSubtaskId.value}/metadata`, {
+      method: 'PATCH',
+      credentials: 'include',
+      body: {
+        priority: subtaskForm.priority,
+        difficulty: subtaskForm.difficulty,
+        timeEstimateMinutes: subtaskForm.timeEstimateMinutes || null
+      }
+    })
+
+    // Invalidate cached detail so it reloads with fresh points
+    const next = new Map(detailsByTaskId.value)
+    next.delete(editingSubtaskParentTaskId.value)
+    detailsByTaskId.value = next
+
+    // Reload detail and refresh list totals
+    const parentId = editingSubtaskParentTaskId.value
+    closeSubtaskEditor()
+    await Promise.all([
+      loadDetailForTask(parentId),
+      refreshList()
+    ])
+  } catch (fetchError: unknown) {
+    subtaskSaveError.value = parseApiErrorMessage(fetchError, 'Could not save subtask metadata')
+  } finally {
+    savingSubtaskMetadata.value = false
+  }
+}
+
+function resetMetadataForm(metadata: TaskGroupMetadata) {
+  metadataForm.badge = metadata.badge
+  metadataForm.completionBonusPoints = metadata.completionBonusPoints
+}
 
 function parseApiErrorMessage(fetchError: unknown, fallbackMessage: string): string {
   const candidate = fetchError as {
@@ -408,15 +502,19 @@ async function saveTaskMetadata() {
       method: 'PATCH',
       credentials: 'include',
       body: {
-        priority: metadataForm.priority,
-        difficulty: metadataForm.difficulty,
-        timeEstimateMinutes: metadataForm.timeEstimateMinutes,
-        completionBonusEnabled: metadataForm.completionBonusEnabled,
-        completionBonusPercent: metadataForm.completionBonusPercent,
         badge: metadataForm.badge,
-        customPointOverride: metadataForm.customPointOverride
+        completionBonusPoints: metadataForm.completionBonusPoints
       }
     })
+
+    // Invalidate the inline-expanded detail cache so it shows fresh data
+    const parentId = editingTaskId.value
+    const next = new Map(detailsByTaskId.value)
+    next.delete(parentId)
+    detailsByTaskId.value = next
+    if (expandedTaskIds.value.has(parentId)) {
+      void loadDetailForTask(parentId)
+    }
 
     closeEditor()
     await refreshList()
@@ -443,17 +541,6 @@ function progressLabel(task: EnrichedTask) {
   return `${task.progressPercent ?? 0}%`
 }
 
-function taskPriorityColor(priority: TodoistTaskMetadata['priority']) {
-  switch (priority) {
-    case 'high':
-      return 'error'
-    case 'medium':
-      return 'warning'
-    case 'low':
-      return 'neutral'
-  }
-}
-
 function deadlineColor(task: EnrichedTask) {
   if (!task.deadline) return 'neutral'
   return task.isDeadlineApproaching ? 'error' : 'primary'
@@ -461,8 +548,6 @@ function deadlineColor(task: EnrichedTask) {
 
 const sortableColumns: Array<{ value: Exclude<SortByValue, 'none'>, label: string, align?: 'left' | 'right' }> = [
   { value: 'task', label: 'Task' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'difficulty', label: 'Difficulty' },
   { value: 'estimatedPoints', label: 'Estimated points' },
   { value: 'deadline', label: 'Deadline' }
 ]
@@ -664,102 +749,223 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
               </tr>
             </thead>
             <tbody>
-              <tr
+              <template
                 v-for="task in tasks"
                 :key="task.id"
-                class="border-b border-default/30 align-top"
-                :data-testid="`task-row-${task.todoistTaskId}`"
               >
-                <td class="py-3 pr-4">
-                  <p class="font-medium text-highlighted leading-6">
-                    {{ task.title }}
-                  </p>
-                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                <!-- Parent group row -->
+                <tr
+                  class="border-b border-default/30 align-top"
+                  :class="expandedTaskIds.has(task.id) ? 'bg-muted/10' : ''"
+                  :data-testid="`task-row-${task.todoistTaskId}`"
+                >
+                  <td class="py-3 pr-4">
+                    <div class="flex items-start gap-2">
+                      <button
+                        v-if="task.subtaskCount > 0"
+                        type="button"
+                        class="mt-0.5 shrink-0 text-toned hover:text-highlighted transition-colors"
+                        :aria-label="expandedTaskIds.has(task.id) ? 'Collapse subtasks' : 'Expand subtasks'"
+                        :data-testid="`task-expand-${task.todoistTaskId}`"
+                        @click="toggleExpand(task)"
+                      >
+                        <UIcon
+                          :name="expandedTaskIds.has(task.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                          class="h-4 w-4"
+                        />
+                      </button>
+                      <span
+                        v-else
+                        class="mt-0.5 shrink-0 w-4 h-4"
+                      />
+                      <div>
+                        <p class="font-medium text-highlighted leading-6">
+                          {{ task.title }}
+                        </p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                          <UBadge
+                            color="neutral"
+                            variant="subtle"
+                          >
+                            {{ task.projectName ?? 'No project' }}
+                          </UBadge>
+                          <UBadge
+                            v-if="task.isCompleted"
+                            color="success"
+                            variant="subtle"
+                          >
+                            Completed
+                          </UBadge>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3 pr-4">
                     <UBadge
-                      color="neutral"
-                      variant="subtle"
-                    >
-                      {{ task.projectName ?? 'No project' }}
-                    </UBadge>
-                    <UBadge
-                      v-if="task.isCompleted"
-                      color="success"
-                      variant="subtle"
-                    >
-                      Completed
-                    </UBadge>
-                  </div>
-                </td>
-                <td class="py-3 pr-4">
-                  <div class="flex items-center gap-2">
-                    <UBadge
-                      :color="taskPriorityColor(task.metadata.priority)"
+                      v-if="task.metadata.badge"
+                      color="primary"
                       variant="soft"
                     >
-                      {{ task.metadata.priority }}
+                      {{ task.metadata.badge }}
                     </UBadge>
-                  </div>
-                </td>
-                <td class="py-3 pr-4">
-                  <div class="flex items-center gap-2">
-                    <span class="text-toned">Difficulty {{ task.metadata.difficulty }}/10</span>
-                  </div>
-                </td>
-                <td class="py-3 pr-4">
-                  <p
-                    class="text-xl font-semibold text-primary leading-6"
-                    :data-testid="`task-points-${task.todoistTaskId}`"
-                  >
-                    {{ task.estimatedPoints }}
-                  </p>
-                </td>
-                <td class="py-3 pr-4">
-                  <div class="space-y-1">
-                    <UBadge
-                      :color="deadlineColor(task)"
-                      variant="subtle"
-                    >
-                      {{ formatDate(task.deadline) }}
-                    </UBadge>
+                  </td>
+                  <td class="py-3 pr-4">
                     <p
-                      v-if="task.isDeadlineApproaching"
-                      class="text-xs font-medium text-error"
+                      class="text-xl font-semibold text-primary leading-6"
+                      :data-testid="`task-points-${task.todoistTaskId}`"
                     >
-                      Due soon
-                    </p>
-                  </div>
-                </td>
-                <td class="py-3 pr-4">
-                  <div class="space-y-1">
-                    <p class="font-medium text-highlighted">
-                      {{ progressLabel(task) }}
+                      {{ task.estimatedPoints }}
                     </p>
                     <p
-                      v-if="task.eligibleForProgressTracking"
+                      v-if="task.completionBonusPoints > 0"
                       class="text-xs text-toned"
                     >
-                      {{ task.completedSubtaskCount }} / {{ task.subtaskCount }} subtasks complete
+                      +{{ task.completionBonusPoints }} bonus
                     </p>
-                    <p
-                      v-else
-                      class="text-xs text-toned"
+                  </td>
+                  <td class="py-3 pr-4">
+                    <div class="space-y-1">
+                      <UBadge
+                        :color="deadlineColor(task)"
+                        variant="subtle"
+                      >
+                        {{ formatDate(task.deadline) }}
+                      </UBadge>
+                      <p
+                        v-if="task.isDeadlineApproaching"
+                        class="text-xs font-medium text-error"
+                      >
+                        Due soon
+                      </p>
+                    </div>
+                  </td>
+                  <td class="py-3 pr-4">
+                    <div class="space-y-1">
+                      <p class="font-medium text-highlighted">
+                        {{ progressLabel(task) }}
+                      </p>
+                      <p
+                        v-if="task.eligibleForProgressTracking"
+                        class="text-xs text-toned"
+                      >
+                        {{ task.completedSubtaskCount }} / {{ task.subtaskCount }} subtasks
+                      </p>
+                      <p
+                        v-else
+                        class="text-xs text-toned"
+                      >
+                        Sync to track progress.
+                      </p>
+                    </div>
+                  </td>
+                  <td class="py-3 text-right">
+                    <UButton
+                      label="Edit"
+                      icon="i-lucide-pencil"
+                      size="sm"
+                      color="neutral"
+                      variant="outline"
+                      :data-testid="`task-edit-${task.todoistTaskId}`"
+                      @click="openEditor(task)"
+                    />
+                  </td>
+                </tr>
+
+                <!-- Subtask rows (expanded) -->
+                <template v-if="expandedTaskIds.has(task.id)">
+                  <!-- Loading state -->
+                  <tr v-if="detailPendingIds.has(task.id)">
+                    <td
+                      colspan="6"
+                      class="py-3 pl-10 pr-4 text-sm text-toned border-b border-default/20 bg-muted/5"
                     >
-                      Progress tracking starts after subtasks are synced.
-                    </p>
-                  </div>
-                </td>
-                <td class="py-3 text-right">
-                  <UButton
-                    label="Edit"
-                    icon="i-lucide-pencil"
-                    size="sm"
-                    color="neutral"
-                    variant="outline"
-                    :data-testid="`task-edit-${task.todoistTaskId}`"
-                    @click="openEditor(task)"
-                  />
-                </td>
-              </tr>
+                      <USkeleton class="h-5 w-1/3 rounded" />
+                    </td>
+                  </tr>
+
+                  <!-- Error state -->
+                  <tr v-else-if="detailErrorIds.has(task.id)">
+                    <td
+                      colspan="6"
+                      class="py-3 pl-10 pr-4 border-b border-default/20 bg-muted/5"
+                    >
+                      <p class="text-sm text-error">
+                        {{ detailErrorIds.get(task.id) }}
+                      </p>
+                      <UButton
+                        label="Retry"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        class="mt-1"
+                        @click="retryDetailLoad(task.id)"
+                      />
+                    </td>
+                  </tr>
+
+                  <!-- Subtask rows -->
+                  <template v-else-if="detailsByTaskId.has(task.id)">
+                    <tr
+                      v-if="detailsByTaskId.get(task.id)!.subtasks.length === 0"
+                    >
+                      <td
+                        colspan="6"
+                        class="py-3 pl-10 pr-4 text-sm text-toned border-b border-default/20 bg-muted/5"
+                      >
+                        No subtasks synced yet.
+                      </td>
+                    </tr>
+                    <tr
+                      v-for="subtask in detailsByTaskId.get(task.id)!.subtasks"
+                      :key="subtask.id"
+                      class="border-b border-default/20 bg-muted/5 align-middle text-sm"
+                    >
+                      <td class="py-2 pl-10 pr-4">
+                        <div class="flex items-center gap-2">
+                          <UIcon
+                            :name="subtask.isCompleted ? 'i-lucide-check-circle-2' : 'i-lucide-circle'"
+                            class="h-4 w-4 shrink-0"
+                            :class="subtask.isCompleted ? 'text-success' : 'text-toned'"
+                          />
+                          <span :class="subtask.isCompleted ? 'line-through text-toned' : 'text-highlighted'">
+                            {{ subtask.title }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="py-2 pr-4">
+                        <UBadge
+                          :color="subtask.metadata.priority === 'high' ? 'error' : subtask.metadata.priority === 'medium' ? 'warning' : 'neutral'"
+                          variant="subtle"
+                          size="xs"
+                        >
+                          {{ subtask.metadata.priority }}
+                        </UBadge>
+                      </td>
+                      <td class="py-2 pr-4">
+                        <span class="font-semibold text-primary">{{ subtask.estimatedPoints }}</span>
+                        <span class="text-toned ml-1">pts</span>
+                      </td>
+                      <td class="py-2 pr-4 text-toned">
+                        D{{ subtask.metadata.difficulty }}
+                        <span v-if="subtask.metadata.timeEstimateMinutes">
+                          · {{ subtask.metadata.timeEstimateMinutes }}m
+                        </span>
+                      </td>
+                      <td class="py-2 pr-4" />
+                      <td class="py-2 text-right">
+                        <UButton
+                          label="Edit"
+                          icon="i-lucide-pencil"
+                          size="xs"
+                          color="neutral"
+                          variant="ghost"
+                          @click="openSubtaskEditor(task.id, subtask)"
+                        />
+                      </td>
+                    </tr>
+                  </template>
+                </template>
+              </template>
             </tbody>
           </table>
         </UCard>
@@ -773,9 +979,23 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
           >
             <div class="space-y-4">
               <div>
-                <p class="font-semibold text-highlighted leading-6">
-                  {{ task.title }}
-                </p>
+                <div class="flex items-start justify-between gap-2">
+                  <p class="font-semibold text-highlighted leading-6">
+                    {{ task.title }}
+                  </p>
+                  <button
+                    v-if="task.subtaskCount > 0"
+                    type="button"
+                    class="shrink-0 text-toned hover:text-highlighted transition-colors mt-0.5"
+                    :aria-label="expandedTaskIds.has(task.id) ? 'Collapse subtasks' : 'Expand subtasks'"
+                    @click="toggleExpand(task)"
+                  >
+                    <UIcon
+                      :name="expandedTaskIds.has(task.id) ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                      class="h-5 w-5"
+                    />
+                  </button>
+                </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                   <UBadge
                     color="neutral"
@@ -784,10 +1004,11 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
                     {{ task.projectName ?? 'No project' }}
                   </UBadge>
                   <UBadge
-                    :color="taskPriorityColor(task.metadata.priority)"
+                    v-if="task.metadata.badge"
+                    color="primary"
                     variant="soft"
                   >
-                    {{ task.metadata.priority }}
+                    {{ task.metadata.badge }}
                   </UBadge>
                   <UBadge
                     v-if="task.isCompleted"
@@ -802,18 +1023,14 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
               <dl class="grid gap-3 sm:grid-cols-2">
                 <div>
                   <dt class="text-xs uppercase tracking-wide text-toned">
-                    Difficulty
-                  </dt>
-                  <dd class="mt-1 font-medium text-highlighted">
-                    {{ task.metadata.difficulty }} / 10
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-toned">
                     Estimated points
                   </dt>
                   <dd class="mt-1 text-xl font-semibold text-primary">
                     {{ task.estimatedPoints }}
+                    <span
+                      v-if="task.completionBonusPoints > 0"
+                      class="text-sm font-normal text-toned"
+                    >+{{ task.completionBonusPoints }} bonus</span>
                   </dd>
                 </div>
                 <div>
@@ -841,12 +1058,72 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
                   </dt>
                   <dd class="mt-1 font-medium text-highlighted">
                     {{ progressLabel(task) }}
+                    <span
+                      v-if="task.eligibleForProgressTracking"
+                      class="text-sm font-normal text-toned"
+                    >
+                      ({{ task.completedSubtaskCount }}/{{ task.subtaskCount }})
+                    </span>
                   </dd>
                 </div>
               </dl>
 
+              <!-- Expanded subtask list (mobile) -->
+              <div v-if="expandedTaskIds.has(task.id)">
+                <p
+                  v-if="detailPendingIds.has(task.id)"
+                  class="text-sm text-toned"
+                >
+                  Loading subtasks…
+                </p>
+                <p
+                  v-else-if="detailErrorIds.has(task.id)"
+                  class="text-sm text-error"
+                >
+                  {{ detailErrorIds.get(task.id) }}
+                </p>
+                <div
+                  v-else-if="detailsByTaskId.has(task.id)"
+                  class="space-y-2 rounded-xl border border-default/60 bg-background/70 p-3"
+                >
+                  <p
+                    v-if="detailsByTaskId.get(task.id)!.subtasks.length === 0"
+                    class="text-sm text-toned"
+                  >
+                    No subtasks synced yet.
+                  </p>
+                  <div
+                    v-for="subtask in detailsByTaskId.get(task.id)!.subtasks"
+                    :key="subtask.id"
+                    class="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <div class="flex items-center gap-2 min-w-0">
+                      <UIcon
+                        :name="subtask.isCompleted ? 'i-lucide-check-circle-2' : 'i-lucide-circle'"
+                        class="h-4 w-4 shrink-0"
+                        :class="subtask.isCompleted ? 'text-success' : 'text-toned'"
+                      />
+                      <span
+                        class="truncate"
+                        :class="subtask.isCompleted ? 'line-through text-toned' : 'text-highlighted'"
+                      >{{ subtask.title }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="font-semibold text-primary text-xs">{{ subtask.estimatedPoints }}pts</span>
+                      <UButton
+                        icon="i-lucide-pencil"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        @click="openSubtaskEditor(task.id, subtask)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <UButton
-                label="Edit metadata"
+                label="Edit task settings"
                 icon="i-lucide-pencil"
                 color="neutral"
                 variant="outline"
@@ -908,55 +1185,6 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Priority">
-                <select
-                  v-model="metadataForm.priority"
-                  data-testid="metadata-priority"
-                  class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm"
-                >
-                  <option
-                    v-for="option in priorityOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-              </UFormField>
-
-              <UFormField label="Difficulty (1-10)">
-                <UInput
-                  v-model.number="metadataForm.difficulty"
-                  data-testid="metadata-difficulty"
-                  type="number"
-                  min="1"
-                  max="10"
-                  step="1"
-                />
-              </UFormField>
-
-              <UFormField label="Time estimate (minutes)">
-                <UInput
-                  v-model="metadataTimeEstimateInput"
-                  data-testid="metadata-time-estimate"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Optional"
-                />
-              </UFormField>
-
-              <UFormField label="Custom point override">
-                <UInput
-                  v-model="metadataCustomOverrideInput"
-                  data-testid="metadata-custom-override"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Optional"
-                />
-              </UFormField>
-
               <UFormField
                 label="Badge"
                 class="sm:col-span-2"
@@ -970,27 +1198,17 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
               </UFormField>
 
               <UFormField
-                label="Completion bonus"
+                label="Completion bonus points"
                 class="sm:col-span-2"
               >
-                <div class="flex flex-wrap items-center gap-3">
-                  <UCheckbox
-                    v-model="metadataForm.completionBonusEnabled"
-                    data-testid="metadata-bonus-enabled"
-                    label="Enable completion bonus"
-                  />
-                  <UInput
-                    v-model.number="metadataForm.completionBonusPercent"
-                    data-testid="metadata-bonus-percent"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    class="w-28"
-                    :disabled="!metadataForm.completionBonusEnabled"
-                  />
-                  <span class="text-sm text-toned">percent</span>
-                </div>
+                <UInput
+                  v-model.number="metadataForm.completionBonusPoints"
+                  data-testid="metadata-bonus-points"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                />
               </UFormField>
             </div>
 
@@ -1052,6 +1270,97 @@ async function toggleColumnSort(sortBy: Exclude<SortByValue, 'none'>) {
               />
             </div>
           </template>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Subtask settings modal -->
+    <UModal
+      v-model:open="subtaskEditorOpen"
+      title="Subtask settings"
+      :dismissible="!savingSubtaskMetadata"
+      @update:open="(isOpen) => { if (!isOpen) closeSubtaskEditor() }"
+    >
+      <template #body>
+        <div class="space-y-5">
+          <div
+            v-if="editingSubtask"
+            class="rounded-2xl border border-default/70 bg-muted/20 p-4"
+          >
+            <p class="font-semibold text-highlighted">
+              {{ editingSubtask.title }}
+            </p>
+            <p class="text-sm text-toned mt-1">
+              Current reward: <span class="font-semibold text-primary">{{ editingSubtask.estimatedPoints }} pts</span>
+            </p>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField label="Priority">
+              <select
+                v-model="subtaskForm.priority"
+                class="w-full rounded-md border border-default bg-background px-3 py-2 text-sm"
+              >
+                <option
+                  v-for="opt in priorityOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </UFormField>
+
+            <UFormField
+              label="Difficulty"
+              hint="1–10"
+            >
+              <UInput
+                v-model.number="subtaskForm.difficulty"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Time estimate (minutes)"
+              class="sm:col-span-2"
+              hint="Optional"
+            >
+              <UInput
+                :model-value="subtaskForm.timeEstimateMinutes !== null ? String(subtaskForm.timeEstimateMinutes) : ''"
+                type="number"
+                min="1"
+                placeholder="Leave blank to skip"
+                @update:model-value="(v) => subtaskForm.timeEstimateMinutes = (v === '' || v === null || v === undefined) ? null : Number(v)"
+              />
+            </UFormField>
+          </div>
+
+          <UAlert
+            v-if="subtaskSaveError"
+            color="error"
+            variant="subtle"
+            :title="subtaskSaveError"
+          />
+
+          <div class="flex justify-end gap-2">
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              :disabled="savingSubtaskMetadata"
+              @click="closeSubtaskEditor"
+            />
+            <UButton
+              label="Save subtask settings"
+              :loading="savingSubtaskMetadata"
+              :disabled="savingSubtaskMetadata"
+              @click="saveSubtaskMetadata"
+            />
+          </div>
         </div>
       </template>
     </UModal>

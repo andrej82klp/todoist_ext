@@ -6,14 +6,13 @@ import { itemMappingsRepository } from '../../repositories/item-mappings'
 import { ledgerRepository } from '../../repositories/ledger'
 import { settingsRepository } from '../../repositories/settings'
 import { streaksRepository } from '../../repositories/streaks'
-import type { TaskWithMetaRow } from '../../repositories/tasks'
+import type { SubtaskWithMetaRow } from '../../repositories/tasks'
 import { tasksRepository } from '../../repositories/tasks'
 import { usersRepository } from '../../repositories/users'
 import { webhookDeliveriesRepository } from '../../repositories/webhook-deliveries'
 import { badRequestError } from '../../utils/api'
 import { logger } from '../../utils/logger'
 import {
-  calculateCompletionBonus,
   calculateTaskPoints
 } from '../points/pointsEngineService'
 import { streakService, yesterdayUtc } from '../streaks/streakService'
@@ -122,20 +121,16 @@ function toStringId(value: unknown): string | null {
 }
 
 /**
- * Projects a task row into the minimal metadata expected by the points engine.
+ * Projects a subtask row into the minimal metadata expected by the points engine.
  *
  * Keep this adapter in sync with `calculateTaskPoints` inputs so task-scoring
  * logic remains decoupled from repository row shapes.
  */
-function rowToTaskMetadata(row: TaskWithMetaRow) {
+function rowToSubtaskMetadata(row: SubtaskWithMetaRow) {
   return {
     priority: row.priority,
     difficulty: row.difficulty,
-    timeEstimateMinutes: row.timeEstimateMinutes,
-    completionBonusEnabled: row.completionBonusEnabled,
-    completionBonusPercent: row.completionBonusPercent,
-    badge: row.badge,
-    customPointOverride: row.customPointOverride
+    timeEstimateMinutes: row.timeEstimateMinutes
   }
 }
 
@@ -256,7 +251,7 @@ function isCompletionEvent(payload: TodoistWebhookPayload): boolean {
  * - Loads user settings and subtask metadata.
  * - Awards subtask points idempotently in the ledger.
  * - If all sibling subtasks are complete, marks parent as complete.
- * - If parent completion bonus is enabled, awards bonus idempotently.
+ * - If parent has a fixed completionBonusPoints > 0, awards it idempotently.
  *
  * This helper must execute inside an existing transaction to keep task mapping,
  * ledger writes, and completion state changes atomic.
@@ -268,57 +263,55 @@ async function processSubtaskCompletion(
   parentTodoistItemId: string | null,
   eventKey: string
 ): Promise<{ pointsEarned: number }> {
-  const [settings, subtaskRow] = await Promise.all([
-    settingsRepository.findByUserIdInTransaction(tx, userId),
-    tasksRepository.findTaskByTodoistItemIdInTransaction(tx, userId, subtaskTodoistItemId)
-  ])
+  let subtaskRow: SubtaskWithMetaRow | null
 
-  if (!subtaskRow) {
-    return { pointsEarned: 0 }
-  }
-
-  const subtaskPoints = calculateTaskPoints(rowToTaskMetadata(subtaskRow), settings)
-
-  await ledgerRepository.createTransactionAndUpdateBalanceInTransactionIdempotent(tx, {
-    userId,
-    transactionType: 'earned',
-    amount: subtaskPoints,
-    description: `Completed subtask: ${subtaskRow.title}`,
-    source: 'todoist_webhook_subtask_completion',
-    relatedEntityType: 'subtask',
-    relatedEntityId: subtaskTodoistItemId,
-    idempotencyKey: `todoist_webhook:subtask_completion:${userId}:${subtaskTodoistItemId}:${eventKey}`,
-    metadata: {
-      eventKey,
-      itemType: 'subtask',
-      todoistItemId: subtaskTodoistItemId
+  if (parentTodoistItemId) {
+    // Subtask has a known parent: load all siblings so we can check all-done later.
+    const [settings, subtaskRows] = await Promise.all([
+      settingsRepository.findByUserIdInTransaction(tx, userId),
+      tasksRepository.getSubtasksWithMetaForTaskInTransaction(tx, userId, parentTodoistItemId)
+    ])
+    subtaskRow = subtaskRows.find(r => r.todoistItemId === subtaskTodoistItemId) ?? null
+    if (!subtaskRow) {
+      return { pointsEarned: 0 }
     }
-  })
 
-  let totalPointsEarned = subtaskPoints
+    const subtaskPoints = calculateTaskPoints(rowToSubtaskMetadata(subtaskRow), settings)
 
-  if (!parentTodoistItemId) {
-    return { pointsEarned: totalPointsEarned }
-  }
+    await ledgerRepository.createTransactionAndUpdateBalanceInTransactionIdempotent(tx, {
+      userId,
+      transactionType: 'earned',
+      amount: subtaskPoints,
+      description: `Completed subtask: ${subtaskRow.title}`,
+      source: 'todoist_webhook_subtask_completion',
+      relatedEntityType: 'subtask',
+      relatedEntityId: subtaskTodoistItemId,
+      idempotencyKey: `todoist_webhook:subtask_completion:${userId}:${subtaskTodoistItemId}:${eventKey}`,
+      metadata: {
+        eventKey,
+        itemType: 'subtask',
+        todoistItemId: subtaskTodoistItemId
+      }
+    })
 
-  const [counts] = await tasksRepository.getSubtaskCountsInTransaction(tx, userId, [parentTodoistItemId])
+    let totalPointsEarned = subtaskPoints
 
-  if (!counts || counts.subtaskCount === 0 || counts.completedSubtaskCount !== counts.subtaskCount) {
-    return { pointsEarned: totalPointsEarned }
-  }
+    const [counts] = await tasksRepository.getSubtaskCountsInTransaction(tx, userId, [parentTodoistItemId])
 
-  await itemMappingsRepository.markCompletionInTransaction(tx, userId, parentTodoistItemId, true)
+    if (!counts || counts.subtaskCount === 0 || counts.completedSubtaskCount !== counts.subtaskCount) {
+      return { pointsEarned: totalPointsEarned }
+    }
 
-  const parentRow = await tasksRepository.findTaskByTodoistItemIdInTransaction(tx, userId, parentTodoistItemId)
+    await itemMappingsRepository.markCompletionInTransaction(tx, userId, parentTodoistItemId, true)
 
-  if (!parentRow || !parentRow.completionBonusEnabled) {
-    return { pointsEarned: totalPointsEarned }
-  }
+    const parentRow = await tasksRepository.findTaskByTodoistItemIdInTransaction(tx, userId, parentTodoistItemId)
 
-  const taskPoints = calculateTaskPoints(rowToTaskMetadata(parentRow), settings)
-  const bonusAmount = calculateCompletionBonus(taskPoints, parentRow.completionBonusPercent)
+    if (!parentRow || parentRow.completionBonusPoints <= 0) {
+      return { pointsEarned: totalPointsEarned }
+    }
 
-  if (bonusAmount > 0) {
+    const bonusAmount = parentRow.completionBonusPoints
+
     await ledgerRepository.createTransactionAndUpdateBalanceInTransactionIdempotent(tx, {
       userId,
       transactionType: 'bonus',
@@ -332,14 +325,44 @@ async function processSubtaskCompletion(
         eventKey,
         itemType: 'task',
         todoistItemId: parentTodoistItemId,
-        bonusPercent: parentRow.completionBonusPercent,
-        basePoints: taskPoints
+        fixedBonusPoints: bonusAmount
       }
     })
     totalPointsEarned += bonusAmount
+
+    return { pointsEarned: totalPointsEarned }
   }
 
-  return { pointsEarned: totalPointsEarned }
+  // Orphan subtask (no parent): look up by its own ID; no parent bonus possible.
+  const [settings, orphanSubtaskRow] = await Promise.all([
+    settingsRepository.findByUserIdInTransaction(tx, userId),
+    tasksRepository.findSubtaskWithMetaByTodoistItemIdInTransaction(tx, userId, subtaskTodoistItemId)
+  ])
+  subtaskRow = orphanSubtaskRow
+
+  if (!subtaskRow) {
+    return { pointsEarned: 0 }
+  }
+
+  const orphanPoints = calculateTaskPoints(rowToSubtaskMetadata(subtaskRow), settings)
+
+  await ledgerRepository.createTransactionAndUpdateBalanceInTransactionIdempotent(tx, {
+    userId,
+    transactionType: 'earned',
+    amount: orphanPoints,
+    description: `Completed subtask: ${subtaskRow.title}`,
+    source: 'todoist_webhook_subtask_completion',
+    relatedEntityType: 'subtask',
+    relatedEntityId: subtaskTodoistItemId,
+    idempotencyKey: `todoist_webhook:subtask_completion:${userId}:${subtaskTodoistItemId}:${eventKey}`,
+    metadata: {
+      eventKey,
+      itemType: 'subtask',
+      todoistItemId: subtaskTodoistItemId
+    }
+  })
+
+  return { pointsEarned: orphanPoints }
 }
 
 export const todoistWebhookService = {

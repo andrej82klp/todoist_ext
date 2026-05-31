@@ -171,7 +171,7 @@ The app should feel like a **clean, modern companion to Todoist**, not a competi
 2.  App receives completion events via webhook
 3.  Points are calculated and added to the user’s balance
 4.  Progress on the related task is updated
-5.  If all subtasks are completed, completion bonus is awarded
+5.  If all subtasks are completed, a fixed completion bonus (configured per parent task) is awarded
 
 ### Flow 4: Maintain or Protect a Streak
 
@@ -302,19 +302,20 @@ Subtask points = (Difficulty × 10) × Priority Multiplier
 
 ### 10.5 Task Completion Bonus
 
-When all subtasks of a task are completed, the app may award a task completion bonus.
+When all subtasks of a task are completed, the app awards a task completion bonus if one is configured for that task.
 
-#### Default Rule
+#### Rule
 
 ```text
-Completion bonus = 10% of total subtask points
+Completion bonus = fixed integer points configured per parent task (default: 0)
 ```
 
 #### Requirements
 
-*   Completion bonus must be configurable
-*   Completion bonus must be optional
-*   Bonus rules must be manageable via global settings
+*   Completion bonus must be a fixed non-negative integer per parent task
+*   Completion bonus is optional (0 = no bonus)
+*   Bonus is awarded exactly once when all sibling subtasks complete
+*   Bonus is not tied to a global percentage setting; each parent task configures its own bonus directly
 
 ***
 

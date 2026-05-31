@@ -20,12 +20,6 @@ import { taskAssemblyService } from '../tasks/taskAssemblyService'
 type MilestoneRow = Awaited<ReturnType<typeof settingsRepository.findMilestonesByUserId>>[number]
 type NotificationRow = Awaited<ReturnType<typeof dashboardRepository.listActiveNotificationsByUserId>>[number]
 
-const priorityOrder = {
-  low: 1,
-  medium: 2,
-  high: 3
-} as const
-
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -62,8 +56,7 @@ function mapTodayTask(task: EnrichedTask): DashboardTaskSummary {
     todoistTaskId: task.todoistTaskId,
     title: task.title,
     deadline: task.deadline,
-    priority: task.metadata.priority,
-    difficulty: task.metadata.difficulty,
+    badge: task.metadata.badge,
     estimatedPoints: task.estimatedPoints,
     progressPercent: task.progressPercent
   }
@@ -75,11 +68,6 @@ function sortTodayTasks(left: EnrichedTask, right: EnrichedTask) {
 
   if (leftDeadline !== rightDeadline) {
     return leftDeadline - rightDeadline
-  }
-
-  const priorityDelta = priorityOrder[right.metadata.priority] - priorityOrder[left.metadata.priority]
-  if (priorityDelta !== 0) {
-    return priorityDelta
   }
 
   if (left.estimatedPoints !== right.estimatedPoints) {

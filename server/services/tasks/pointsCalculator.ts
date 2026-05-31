@@ -3,7 +3,7 @@ import type { PriorityLevel } from '../../../shared/types'
 interface PointsCalculationInput {
   priority: PriorityLevel
   difficulty: number
-  customPointOverride: number | null
+  customPointOverride?: number | null
 }
 
 interface PointsSettings {
@@ -17,7 +17,7 @@ export function calculateEstimatedPoints(
   task: PointsCalculationInput,
   settings: PointsSettings
 ): number {
-  if (task.customPointOverride !== null) {
+  if (task.customPointOverride != null) {
     return task.customPointOverride
   }
 

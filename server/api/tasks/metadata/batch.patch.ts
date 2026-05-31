@@ -1,4 +1,4 @@
-import { batchMetadataUpdateSchema } from '../../../../shared/schemas'
+import { batchGroupMetadataUpdateSchema } from '../../../../shared/schemas'
 import { defineApiHandler, success, tooManyRequestsError } from '../../../utils/api'
 import { checkRateLimit, createRateLimiter } from '../../../utils/rate-limit'
 import { requireCurrentUser } from '../../../utils/session'
@@ -15,21 +15,16 @@ export default defineApiHandler(async (event) => {
     throw tooManyRequestsError()
   }
 
-  const body = await parseBodyWithSchema(event, batchMetadataUpdateSchema)
+  const body = await parseBodyWithSchema(event, batchGroupMetadataUpdateSchema)
 
   const results = await Promise.allSettled(
     body.items.map(async (item) => {
       const task = await tasksRepository.findTaskById(user.id, item.taskId)
       if (!task) return { taskId: item.taskId, success: false }
 
-      await tasksRepository.upsertTaskMetadata(user.id, item.taskId, {
-        priority: item.priority,
-        difficulty: item.difficulty,
-        timeEstimateMinutes: item.timeEstimateMinutes,
-        completionBonusEnabled: item.completionBonusEnabled,
-        completionBonusPercent: item.completionBonusPercent,
+      await tasksRepository.upsertTaskGroupMetadata(user.id, item.taskId, {
         badge: item.badge,
-        customPointOverride: item.customPointOverride
+        completionBonusPoints: item.completionBonusPoints
       })
 
       return { taskId: item.taskId, success: true }
