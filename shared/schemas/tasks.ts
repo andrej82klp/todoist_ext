@@ -2,17 +2,18 @@ import { z } from 'zod'
 
 import { nullableIntegerSchema, nullableTrimmedStringSchema, priorityLevelSchema } from './common'
 
-export const taskMetadataSchema = z.object({
-  priority: priorityLevelSchema,
-  difficulty: z.coerce.number().int().min(1).max(10),
-  timeEstimateMinutes: nullableIntegerSchema.optional().default(null),
-  completionBonusEnabled: z.boolean(),
-  completionBonusPercent: z.coerce.number().min(0).max(100),
+export const taskGroupMetadataSchema = z.object({
   badge: nullableTrimmedStringSchema.optional().default(null),
-  customPointOverride: nullableIntegerSchema.optional().default(null)
+  completionBonusPoints: z.coerce.number().int().nonnegative()
 }).strict()
 
-export const taskMetadataUpdateSchema = taskMetadataSchema.partial().refine(
+export const subtaskMetadataSchema = z.object({
+  priority: priorityLevelSchema,
+  difficulty: z.coerce.number().int().min(1).max(10),
+  timeEstimateMinutes: nullableIntegerSchema.optional().default(null)
+}).strict()
+
+export const taskGroupMetadataUpdateSchema = taskGroupMetadataSchema.partial().refine(
   payload => Object.keys(payload).length > 0,
   {
     message: 'At least one metadata field must be provided',
@@ -20,10 +21,28 @@ export const taskMetadataUpdateSchema = taskMetadataSchema.partial().refine(
   }
 )
 
-export const batchMetadataUpdateItemSchema = taskMetadataSchema.extend({
+export const subtaskMetadataUpdateSchema = subtaskMetadataSchema.partial().refine(
+  payload => Object.keys(payload).length > 0,
+  {
+    message: 'At least one metadata field must be provided',
+    path: ['_root']
+  }
+)
+
+export const batchGroupMetadataUpdateItemSchema = taskGroupMetadataSchema.extend({
   taskId: z.string().uuid()
 })
 
-export const batchMetadataUpdateSchema = z.object({
-  items: z.array(batchMetadataUpdateItemSchema).min(1).max(50)
+export const batchGroupMetadataUpdateSchema = z.object({
+  items: z.array(batchGroupMetadataUpdateItemSchema).min(1).max(50)
 }).strict()
+
+// Legacy aliases kept for backward compatibility during migration
+/** @deprecated Use taskGroupMetadataSchema or subtaskMetadataSchema */
+export const taskMetadataSchema = subtaskMetadataSchema
+/** @deprecated Use taskGroupMetadataUpdateSchema or subtaskMetadataUpdateSchema */
+export const taskMetadataUpdateSchema = subtaskMetadataUpdateSchema
+/** @deprecated Use batchGroupMetadataUpdateSchema */
+export const batchMetadataUpdateItemSchema = batchGroupMetadataUpdateItemSchema
+/** @deprecated Use batchGroupMetadataUpdateSchema */
+export const batchMetadataUpdateSchema = batchGroupMetadataUpdateSchema

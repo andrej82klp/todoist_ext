@@ -177,17 +177,26 @@ These types are reused across endpoints.
 }
 ```
 
-### 4.5 TodoistTaskMetadata
+### 4.5 TaskGroupMetadata
+
+Parent task metadata. Controls badge display and the fixed bonus awarded when all sibling subtasks complete.
+
+```json
+{
+  "badge": "Deep Work",
+  "completionBonusPoints": 10
+}
+```
+
+### 4.6 SubtaskMetadata
+
+Per-subtask scoring metadata. Points are derived from `priority × difficulty × difficultyMultiplierBase`.
 
 ```json
 {
   "priority": "medium",
   "difficulty": 5,
-  "timeEstimateMinutes": 45,
-  "completionBonusEnabled": true,
-  "completionBonusPercent": 10,
-  "badge": "Deep Work",
-  "customPointOverride": null
+  "timeEstimateMinutes": 45
 }
 ```
 
@@ -481,7 +490,7 @@ Returns task list enriched with app metadata.
 #### Query Parameters
 
 - `projectId?: string`
-- `sortBy?: "priority" | "difficulty" | "estimatedPoints" | "deadline"`
+- `sortBy?: "task" | "estimatedPoints" | "deadline"`
 - `sortOrder?: "asc" | "desc"`
 - `includeCompleted?: boolean` (default `false`)
 - `page?: number`
@@ -507,14 +516,11 @@ Returns task list enriched with app metadata.
       "progressPercent": 50,
       "eligibleForProgressTracking": true,
       "metadata": {
-        "priority": "high",
-        "difficulty": 6,
-        "timeEstimateMinutes": 60,
-        "completionBonusEnabled": true,
-        "completionBonusPercent": 10,
         "badge": null,
-        "customPointOverride": null
+        "completionBonusPoints": 10
       },
+      "subtaskPointsTotal": 80,
+      "completionBonusPoints": 10,
       "estimatedPoints": 90,
       "isCompleted": false,
       "isDeadlineApproaching": true
@@ -557,14 +563,11 @@ Returns a task with subtasks and metadata.
     "progressPercent": 50,
     "eligibleForProgressTracking": true,
     "metadata": {
-      "priority": "high",
-      "difficulty": 6,
-      "timeEstimateMinutes": 60,
-      "completionBonusEnabled": true,
-      "completionBonusPercent": 10,
       "badge": null,
-      "customPointOverride": null
+      "completionBonusPoints": 10
     },
+    "subtaskPointsTotal": 80,
+    "completionBonusPoints": 10,
     "estimatedPoints": 90,
     "subtasks": [
       {
@@ -572,14 +575,26 @@ Returns a task with subtasks and metadata.
         "todoistTaskId": "987654322",
         "title": "Draft outline",
         "isCompleted": true,
-        "earnedPoints": 30
+        "earnedPoints": 30,
+        "estimatedPoints": 30,
+        "metadata": {
+          "priority": "high",
+          "difficulty": 3,
+          "timeEstimateMinutes": 30
+        }
       },
       {
         "id": "sub_2",
         "todoistTaskId": "987654323",
         "title": "Create visuals",
         "isCompleted": false,
-        "earnedPoints": null
+        "earnedPoints": null,
+        "estimatedPoints": 50,
+        "metadata": {
+          "priority": "medium",
+          "difficulty": 4,
+          "timeEstimateMinutes": null
+        }
       }
     ]
   }
@@ -588,33 +603,25 @@ Returns a task with subtasks and metadata.
 
 ---
 
-## 9.3 Upsert Task Metadata
+## 9.3 Upsert Parent Task Metadata
 
 ### `PATCH /api/tasks/{taskId}/metadata`
 
-Creates or updates app-specific metadata for a Todoist task.
+Creates or updates group-level metadata for a **parent** Todoist task. Must not be called with a subtask ID.
 
 #### Request Body
 
 ```json
 {
-  "priority": "high",
-  "difficulty": 6,
-  "timeEstimateMinutes": 60,
-  "completionBonusEnabled": true,
-  "completionBonusPercent": 10,
   "badge": "Deep Work",
-  "customPointOverride": null
+  "completionBonusPoints": 10
 }
 ```
 
 #### Validation Rules
 
-- `priority` required
-- `difficulty` required, integer `1..10`
-- `timeEstimateMinutes` optional, must be `>= 0`
-- `completionBonusPercent` required if `completionBonusEnabled = true`
-- `completionBonusPercent` must be `>= 0`
+- `badge` optional, string or null, max 64 chars
+- `completionBonusPoints` optional, non-negative integer
 
 #### Success Response
 
@@ -623,13 +630,8 @@ Creates or updates app-specific metadata for a Todoist task.
   "data": {
     "taskId": "task_1",
     "metadata": {
-      "priority": "high",
-      "difficulty": 6,
-      "timeEstimateMinutes": 60,
-      "completionBonusEnabled": true,
-      "completionBonusPercent": 10,
       "badge": "Deep Work",
-      "customPointOverride": null
+      "completionBonusPoints": 10
     }
   }
 }
@@ -637,11 +639,51 @@ Creates or updates app-specific metadata for a Todoist task.
 
 ---
 
-## 9.4 Batch Upsert Task Metadata
+## 9.5 Upsert Subtask Metadata
+
+### `PATCH /api/tasks/{taskId}/subtasks/{subtaskId}/metadata`
+
+Creates or updates scoring metadata for a **subtask**. The subtask must belong to the specified parent task.
+
+#### Request Body
+
+```json
+{
+  "priority": "high",
+  "difficulty": 6,
+  "timeEstimateMinutes": 60
+}
+```
+
+#### Validation Rules
+
+- `priority` optional, one of `"low" | "medium" | "high"`
+- `difficulty` optional, integer `1..10`
+- `timeEstimateMinutes` optional, positive integer or null
+- At least one field must be present
+
+#### Success Response
+
+```json
+{
+  "data": {
+    "subtaskId": "sub_1",
+    "metadata": {
+      "priority": "high",
+      "difficulty": 6,
+      "timeEstimateMinutes": 60
+    }
+  }
+}
+```
+
+---
+
+## 9.4 Batch Upsert Parent Task Metadata
 
 ### `PATCH /api/tasks/metadata/batch`
 
-Used when the frontend saves multiple task metadata changes in one action.
+Updates group-level metadata (`badge`, `completionBonusPoints`) for multiple parent tasks in one request.
 
 #### Request Body
 
@@ -650,13 +692,8 @@ Used when the frontend saves multiple task metadata changes in one action.
   "items": [
     {
       "taskId": "task_1",
-      "priority": "high",
-      "difficulty": 6,
-      "timeEstimateMinutes": 60,
-      "completionBonusEnabled": true,
-      "completionBonusPercent": 10,
-      "badge": null,
-      "customPointOverride": null
+      "badge": "Focus",
+      "completionBonusPoints": 5
     }
   ]
 }
@@ -920,9 +957,7 @@ Returns all user-configurable settings needed by the settings page.
         "low": 1.0,
         "medium": 1.25,
         "high": 1.5
-      },
-      "defaultCompletionBonusEnabled": true,
-      "defaultCompletionBonusPercent": 10
+      }
     },
     "streak": {
       "ruleType": "points",
@@ -969,9 +1004,7 @@ Updates one or more global settings sections.
       "low": 1.0,
       "medium": 1.25,
       "high": 1.5
-    },
-    "defaultCompletionBonusEnabled": true,
-    "defaultCompletionBonusPercent": 10
+    }
   },
   "streak": {
     "ruleType": "points",
@@ -995,7 +1028,6 @@ Updates one or more global settings sections.
 
 - `difficultyMultiplierBase > 0`
 - all priority multipliers `> 0`
-- `defaultCompletionBonusPercent >= 0`
 - `ruleType` must be `tasks` or `points`
 - `ruleValue > 0`
 - `bonusStrategy` must be `fixed` or `percentage`
@@ -1014,9 +1046,7 @@ Updates one or more global settings sections.
           "low": 1.0,
           "medium": 1.25,
           "high": 1.5
-        },
-        "defaultCompletionBonusEnabled": true,
-        "defaultCompletionBonusPercent": 10
+        }
       },
       "streak": {
         "ruleType": "points",

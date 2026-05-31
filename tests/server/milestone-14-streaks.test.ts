@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net'
 
 import { eq } from 'drizzle-orm'
 import { createApp, createRouter, toNodeListener } from 'h3'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import sessionPostHandler from '../../server/api/internal/test-auth/session.post'
 import dashboardGetHandler from '../../server/api/dashboard/index.get'
@@ -32,6 +32,9 @@ import { streaksRepository } from '../../server/repositories/streaks'
 import { tasksRepository } from '../../server/repositories/tasks'
 import sessionMiddleware from '../../server/middleware/session'
 
+// Increase test timeout to 30s for webhook + Neon round-trips.
+vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 })
+
 // Helper: enable DB-backed tests when `DATABASE_URL` is set; otherwise they skip.
 const runIfDatabaseConfigured = process.env.DATABASE_URL ? it : it.skip
 
@@ -39,7 +42,9 @@ let server: ReturnType<typeof createServer>
 let baseUrl = ''
 
 function signPayload(payload: string) {
-  const secret = process.env.TODOIST_CLIENT_SECRET ?? 'milestone-14-test-client-secret'
+  const secret = process.env.TODOIST_WEBHOOK_SECRET
+    ?? process.env.TODOIST_CLIENT_SECRET
+    ?? 'milestone-14-test-client-secret'
   return createHmac('sha256', secret).update(payload).digest('base64')
 }
 
@@ -139,14 +144,10 @@ async function createSubtask(userId: string, todoistUserId: string, itemId: stri
   ])
 
   const subtaskMapping = mappings.find(m => m.todoistItemId === itemId)!
-  await tasksRepository.upsertTaskMetadata(userId, subtaskMapping.id, {
+  await tasksRepository.upsertSubtaskMetadata(userId, subtaskMapping.id, {
     priority: 'medium',
     difficulty: 2,
-    timeEstimateMinutes: null,
-    completionBonusEnabled: false,
-    completionBonusPercent: 0,
-    badge: null,
-    customPointOverride: null
+    timeEstimateMinutes: null
   })
 
   return { subtaskMapping, todoistUserId }
@@ -199,6 +200,7 @@ function yesterdayUtc() {
 // This ensures tests can simulate webhook deliveries and streak calculations end-to-end.
 beforeAll(async () => {
   process.env.TODOIST_CLIENT_SECRET ||= 'milestone-14-test-client-secret'
+  process.env.TODOIST_WEBHOOK_SECRET ||= 'milestone-14-test-client-secret'
   process.env.SESSION_SECRET ||= 'milestone-14-test-session-secret'
 
   const app = createApp()

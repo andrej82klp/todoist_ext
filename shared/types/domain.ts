@@ -60,8 +60,7 @@ export interface DashboardTaskSummary {
   todoistTaskId: string
   title: string
   deadline: string | null
-  priority: PriorityLevel
-  difficulty: number
+  badge: string | null
   estimatedPoints: number
   progressPercent: number | null
 }
@@ -109,6 +108,17 @@ export interface TodoistTaskMetadata {
   customPointOverride: number | null
 }
 
+export interface TaskGroupMetadata {
+  badge: string | null
+  completionBonusPoints: number
+}
+
+export interface SubtaskMetadata {
+  priority: PriorityLevel
+  difficulty: number
+  timeEstimateMinutes: number | null
+}
+
 export interface LedgerTransaction {
   id: string
   type: LedgerTransactionType
@@ -140,6 +150,8 @@ export interface TaskSubtaskSummary {
   title: string
   isCompleted: boolean
   earnedPoints: number | null
+  metadata: SubtaskMetadata
+  estimatedPoints: number
 }
 
 export interface TaskListProjectOption {
@@ -166,7 +178,9 @@ export interface EnrichedTask {
   completedSubtaskCount: number
   progressPercent: number | null
   eligibleForProgressTracking: boolean
-  metadata: TodoistTaskMetadata
+  metadata: TaskGroupMetadata
+  subtaskPointsTotal: number
+  completionBonusPoints: number
   estimatedPoints: number
   isCompleted: boolean
   isDeadlineApproaching: boolean
@@ -190,8 +204,6 @@ export interface GlobalSettingsPoints {
     medium: number
     high: number
   }
-  defaultCompletionBonusEnabled: boolean
-  defaultCompletionBonusPercent: number
 }
 
 export interface GlobalSettingsStreak {

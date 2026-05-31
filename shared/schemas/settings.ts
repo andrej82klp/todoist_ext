@@ -10,9 +10,7 @@ const priorityMultipliersPatchSchema = z.object({
 
 const pointsPatchSchema = z.object({
   difficultyMultiplierBase: z.coerce.number().int().positive().optional(),
-  priorityMultipliers: priorityMultipliersPatchSchema.optional(),
-  defaultCompletionBonusEnabled: z.boolean().optional(),
-  defaultCompletionBonusPercent: z.coerce.number().min(0).optional()
+  priorityMultipliers: priorityMultipliersPatchSchema.optional()
 }).strict()
 
 export const milestoneDefinitionSchema = z.object({

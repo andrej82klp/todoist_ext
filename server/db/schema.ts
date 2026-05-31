@@ -85,8 +85,7 @@ export const taskMetadata = pgTable('task_metadata', {
   priority: priorityLevelEnum('priority').notNull().default('medium'),
   difficulty: integer('difficulty').notNull().default(1),
   timeEstimateMinutes: integer('time_estimate_minutes'),
-  completionBonusEnabled: boolean('completion_bonus_enabled').notNull().default(true),
-  completionBonusPercent: numeric('completion_bonus_percent', { precision: 5, scale: 2 }).notNull().default('10.00'),
+  completionBonusPoints: integer('completion_bonus_points').notNull().default(0),
   badge: varchar('badge', { length: 64 }),
   customPointOverride: integer('custom_point_override'),
   ...auditColumns()
@@ -95,7 +94,7 @@ export const taskMetadata = pgTable('task_metadata', {
   index('task_metadata_user_id_idx').on(table.userId),
   check('task_metadata_difficulty_check', sql`${table.difficulty} >= 1 and ${table.difficulty} <= 10`),
   check('task_metadata_time_estimate_check', sql`${table.timeEstimateMinutes} is null or ${table.timeEstimateMinutes} >= 0`),
-  check('task_metadata_completion_bonus_percent_check', sql`${table.completionBonusPercent} >= 0`)
+  check('task_metadata_completion_bonus_points_check', sql`${table.completionBonusPoints} >= 0`)
 ])
 
 export const rewards = pgTable('rewards', {
@@ -233,7 +232,6 @@ export const globalSettings = pgTable('global_settings', {
   lowPriorityMultiplier: numeric('low_priority_multiplier', { precision: 5, scale: 2 }).notNull().default('1.00'),
   mediumPriorityMultiplier: numeric('medium_priority_multiplier', { precision: 5, scale: 2 }).notNull().default('1.25'),
   highPriorityMultiplier: numeric('high_priority_multiplier', { precision: 5, scale: 2 }).notNull().default('1.50'),
-  completionBonusPercent: numeric('completion_bonus_percent', { precision: 5, scale: 2 }).notNull().default('10.00'),
   streakRuleType: streakRuleTypeEnum('streak_rule_type').notNull().default('completed_items'),
   streakRuleValue: integer('streak_rule_value').notNull().default(1),
   streakProtectionEnabled: boolean('streak_protection_enabled').notNull().default(true),
@@ -248,7 +246,6 @@ export const globalSettings = pgTable('global_settings', {
   check('global_settings_low_priority_positive_check', sql`${table.lowPriorityMultiplier} > 0`),
   check('global_settings_medium_priority_positive_check', sql`${table.mediumPriorityMultiplier} > 0`),
   check('global_settings_high_priority_positive_check', sql`${table.highPriorityMultiplier} > 0`),
-  check('global_settings_completion_bonus_non_negative_check', sql`${table.completionBonusPercent} >= 0`),
   check('global_settings_streak_rule_value_positive_check', sql`${table.streakRuleValue} > 0`),
   check('global_settings_streak_protection_starting_balance_non_negative_check', sql`${table.streakProtectionStartingBalance} >= 0`),
   check('global_settings_protection_reward_every_n_days_positive_check', sql`${table.protectionRewardEveryNDays} > 0`),

@@ -165,7 +165,22 @@ Partially verified / still open:
      - tokens never leak to the frontend.
      - webhook duplicates are observable.
 
-15. [ ] Milestone 19 — End-to-end MVP validation
+15. [x] Milestone 20 — Grouped subtask task list and item-specific metadata
+   - Detailed execution plan: [Milestone 20 grouped subtask task list plan](../.cursor/plans/plan-groupedSubtaskTaskList.prompt.md).
+   - Restructured task experience so parent Todoist tasks are collapsible groups and subtasks are the sole scoring/actionable items.
+   - Replaced `TodoistTaskMetadata` with `TaskGroupMetadata` (badge, fixed completion bonus points) and `SubtaskMetadata` (priority, difficulty, time estimate).
+   - Added `completion_bonus_points` column to `task_metadata` table; removed deprecated percentage bonus fields.
+   - Added `PATCH /api/tasks/:taskId/subtasks/:subtaskId/metadata` route for per-subtask scoring metadata.
+   - Updated webhook to award points only for subtask completions; parent bonus is a fixed integer, not a percentage.
+   - Rebuilt tasks page with expand/collapse grouped rows, lazy subtask detail loading, and subtask settings modal.
+   - Updated dashboard, analytics, and settings surfaces to drop parent priority/difficulty.
+   - Acceptance:
+     - subtasks are the only point-earning items.
+     - parent bonus is a configurable fixed integer per task.
+     - tasks page shows collapsible parent groups with inline subtask rows.
+     - all contract and integration tests pass.
+
+16. [ ] Milestone 19 — End-to-end MVP validation
    - Validate the full user journey from OAuth through sync, metadata, earning points, streaks, rewards, dashboard, analytics, and reconciliation safety.
    - Acceptance:
      - the core loop works end to end.

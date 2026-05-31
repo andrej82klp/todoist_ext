@@ -250,9 +250,10 @@ Todoist documents both REST-style APIs and a `/sync` endpoint intended for keepi
 
 Handles:
 
-*   progress calculation for tasks with subtasks
-*   subtask scoring
-*   task completion bonus calculation
+*   progress calculation for parent task groups with subtasks
+*   per-subtask scoring (priority × difficulty × base multiplier)
+*   fixed completion bonus award when all sibling subtasks complete
+*   parent group total computation (subtask points total + completion bonus)
 *   transaction creation
 *   idempotent award logic
 
@@ -281,7 +282,6 @@ Handles:
 
 *   global scoring rules
 *   priority multipliers
-*   completion bonus settings
 *   streak rule configuration
 *   milestone thresholds and values
 *   reward catalog configuration
@@ -485,9 +485,10 @@ Business rules should live in a **pure domain service**, not inside controllers 
     *   Low = `1.0`
     *   Medium = `1.25`
     *   High = `1.5`
-*   Completion bonus = `10%` of total subtask points by default
+*   Completion bonus = fixed integer per parent task (default: 0); configured in parent task metadata
+*   Parent estimated points = sum of all subtask estimated points + completion bonus
 
-These values should be overridden via settings.
+These multiplier values can be overridden via settings.
 
 ## 11.2 Calculation Events
 

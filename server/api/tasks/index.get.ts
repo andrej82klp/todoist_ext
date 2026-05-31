@@ -10,7 +10,6 @@ import { taskAssemblyService } from '../../services/tasks/taskAssemblyService'
 type TaskSortField = typeof TASK_SORT_FIELDS[number]
 
 function sortTasks(tasks: EnrichedTask[], sortBy: TaskSortField, sortOrder: 'asc' | 'desc'): EnrichedTask[] {
-  const priorityOrder = { low: 1, medium: 2, high: 3 }
   const dir = sortOrder === 'asc' ? 1 : -1
 
   return [...tasks].sort((a, b) => {
@@ -18,12 +17,6 @@ function sortTasks(tasks: EnrichedTask[], sortBy: TaskSortField, sortOrder: 'asc
     switch (sortBy) {
       case 'task':
         cmp = (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' })
-        break
-      case 'priority':
-        cmp = priorityOrder[a.metadata.priority] - priorityOrder[b.metadata.priority]
-        break
-      case 'difficulty':
-        cmp = a.metadata.difficulty - b.metadata.difficulty
         break
       case 'estimatedPoints':
         cmp = a.estimatedPoints - b.estimatedPoints

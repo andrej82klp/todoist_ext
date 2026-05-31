@@ -8,7 +8,7 @@ export const STREAK_RULE_TYPES = ['completed_items', 'points'] as const
 
 export const SORT_ORDERS = ['asc', 'desc'] as const
 
-export const TASK_SORT_FIELDS = ['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'] as const
+export const TASK_SORT_FIELDS = ['task', 'estimatedPoints', 'deadline'] as const
 
 export const API_ERROR_STATUS = {
   BAD_REQUEST: 400,

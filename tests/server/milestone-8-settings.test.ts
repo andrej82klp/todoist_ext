@@ -110,8 +110,6 @@ describe('Milestone 8 — settings API (authenticated)', () => {
         medium: 1.25,
         high: 1.5
       })
-      expect(payload.data.points.defaultCompletionBonusEnabled).toBe(true)
-      expect(payload.data.points.defaultCompletionBonusPercent).toBe(10)
       expect(payload.data.streak.ruleType).toBe('completed_items')
       expect(payload.data.streak.ruleValue).toBe(1)
       expect(payload.data.streak.milestones.length).toBe(3)

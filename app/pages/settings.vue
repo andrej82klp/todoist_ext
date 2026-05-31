@@ -47,9 +47,7 @@ async function saveSettings() {
       body: {
         points: {
           difficultyMultiplierBase: f.points.difficultyMultiplierBase,
-          priorityMultipliers: { ...f.points.priorityMultipliers },
-          defaultCompletionBonusEnabled: f.points.defaultCompletionBonusEnabled,
-          defaultCompletionBonusPercent: f.points.defaultCompletionBonusPercent
+          priorityMultipliers: { ...f.points.priorityMultipliers }
         },
         streak: {
           ruleType: f.streak.ruleType,
@@ -193,26 +191,6 @@ function removeMilestone(index: number) {
                 />
               </UFormField>
             </div>
-            <UFormField
-              label="Default completion bonus"
-              class="sm:col-span-2"
-            >
-              <div class="flex flex-wrap items-center gap-4">
-                <UCheckbox
-                  v-model="form.points.defaultCompletionBonusEnabled"
-                  label="Enabled"
-                />
-                <UInput
-                  v-model.number="form.points.defaultCompletionBonusPercent"
-                  type="number"
-                  min="0"
-                  step="1"
-                  class="w-12"
-                  :disabled="!form.points.defaultCompletionBonusEnabled"
-                />
-                <span class="text-sm text-toned">%</span>
-              </div>
-            </UFormField>
           </div>
         </UCard>
 
