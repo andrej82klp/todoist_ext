@@ -285,9 +285,28 @@ export const dashboardNotifications = pgTable('dashboard_notifications', {
   index('dashboard_notifications_user_created_at_idx').on(table.userId, table.createdAt)
 ])
 
+export const webhookLogs = pgTable('webhook_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  loggedAt: timestamp('logged_at', { withTimezone: true }).notNull().defaultNow(),
+  type: varchar('type', { length: 64 }).notNull(),
+  method: varchar('method', { length: 16 }),
+  url: text('url'),
+  headers: jsonb('headers'),
+  payload: jsonb('payload'),
+  deliveryKey: varchar('delivery_key', { length: 255 }),
+  status: varchar('status', { length: 64 }),
+  error: jsonb('error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [
+  index('webhook_logs_logged_at_idx').on(table.loggedAt),
+  index('webhook_logs_type_idx').on(table.type),
+  index('webhook_logs_delivery_key_idx').on(table.deliveryKey)
+])
+
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type GlobalSettings = typeof globalSettings.$inferSelect
 export type NewGlobalSettings = typeof globalSettings.$inferInsert
 export type Reward = typeof rewards.$inferSelect
 export type PointLedgerTransaction = typeof pointLedger.$inferSelect
+export type WebhookLog = typeof webhookLogs.$inferSelect
