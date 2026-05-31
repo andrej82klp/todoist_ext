@@ -1,5 +1,8 @@
+import { fileURLToPath, URL } from 'node:url'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui'
@@ -18,6 +21,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     sessionSecret: process.env.SESSION_SECRET
+  },
+  alias: {
+    '#shared': fileURLToPath(new URL('./shared', import.meta.url))
   },
 
   compatibilityDate: '2025-01-15',

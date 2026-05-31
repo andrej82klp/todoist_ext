@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TASK_SORT_FIELDS } from '../../shared/constants/api'
+import { TASK_SORT_FIELDS } from '#shared/constants/api'
 
 import type {
   ApiCollectionResponse,
@@ -9,7 +9,7 @@ import type {
   EnrichedTaskDetail,
   TaskListMeta,
   TodoistTaskMetadata
-} from '../../shared/types'
+} from '#shared/types'
 
 type SortByValue = 'none' | 'task' | 'priority' | 'difficulty' | 'estimatedPoints' | 'deadline'
 

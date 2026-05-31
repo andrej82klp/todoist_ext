@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PointsSummary, RedemptionRecord, Reward, RewardRedemptionResult } from '../../shared/types'
+import type { PointsSummary, RedemptionRecord, Reward, RewardRedemptionResult } from '#shared/types'
 
 interface RewardsListData {
   rewards: Reward[]
