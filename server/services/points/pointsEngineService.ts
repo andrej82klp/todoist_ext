@@ -2,15 +2,16 @@ import type { DatabaseClient } from '../../db/client'
 import { getDb } from '../../db/client'
 import type { GlobalSettings } from '../../db/schema'
 import { ledgerRepository } from '../../repositories/ledger'
-import type { LedgerTransaction, PointsSummary, TodoistTaskMetadata } from '../../../shared/types'
+import type { LedgerTransaction, PointsSummary, SubtaskMetadata } from '../../../shared/types'
 import {
   calculateEstimatedPoints,
   getDefaultPointsSettings,
   settingsToPointsSettings
 } from '../tasks/pointsCalculator'
 
+/** Calculates subtask earned points from its priority/difficulty metadata. */
 export function calculateTaskPoints(
-  metadata: TodoistTaskMetadata,
+  metadata: SubtaskMetadata,
   settingsRow: GlobalSettings | null
 ): number {
   const pointsSettings = settingsRow
@@ -20,6 +21,7 @@ export function calculateTaskPoints(
   return calculateEstimatedPoints(metadata, pointsSettings)
 }
 
+/** @deprecated Use fixed completionBonusPoints from task group metadata instead. */
 export function calculateCompletionBonus(basePoints: number, bonusPercent: number): number {
   if (bonusPercent <= 0) {
     return 0

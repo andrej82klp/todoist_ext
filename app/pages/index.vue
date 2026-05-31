@@ -57,15 +57,8 @@ function transactionTone(type: LedgerTransaction['type']) {
   }
 }
 
-function priorityTone(priority: DashboardTaskSummary['priority']) {
-  switch (priority) {
-    case 'high':
-      return 'error'
-    case 'medium':
-      return 'warning'
-    case 'low':
-      return 'neutral'
-  }
+function badgeTone(_badge: string | null): 'primary' {
+  return 'primary'
 }
 
 function notificationTone(severity: DashboardNotification['severity']) {
@@ -374,14 +367,15 @@ const analyticsStreak = computed(() => analytics.value?.streakHistory ?? { curre
                       {{ task.title }}
                     </h3>
                     <UBadge
-                      :color="priorityTone(task.priority)"
+                      v-if="task.badge"
+                      :color="badgeTone(task.badge)"
                       variant="subtle"
                     >
-                      {{ task.priority }} priority
+                      {{ task.badge }}
                     </UBadge>
                   </div>
                   <p class="mt-2 text-sm text-toned">
-                    Due {{ task.deadline ? formatDate(task.deadline) : 'sometime soon' }} · Difficulty {{ task.difficulty }}
+                    Due {{ task.deadline ? formatDate(task.deadline) : 'sometime soon' }}
                   </p>
                 </div>
 

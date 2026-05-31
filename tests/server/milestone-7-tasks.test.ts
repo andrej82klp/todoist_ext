@@ -14,9 +14,10 @@ import batchMetadataPatchHandler from '../../server/api/tasks/metadata/batch.pat
 import sessionPostHandler from '../../server/api/internal/test-auth/session.post'
 import { closeDbConnection, getDb } from '../../server/db/client'
 import { ensureUserDefaults } from '../../server/db/defaults'
-import { taskMetadata, users } from '../../server/db/schema'
+import { users } from '../../server/db/schema'
 import sessionMiddleware from '../../server/middleware/session'
 import { itemMappingsRepository } from '../../server/repositories/item-mappings'
+import { tasksRepository } from '../../server/repositories/tasks'
 import {
   calculateEstimatedPoints,
   getDefaultPointsSettings,
@@ -179,8 +180,8 @@ describe('Milestone 7 — task list and metadata API', () => {
       expect(task1.completedSubtaskCount).toBe(0)
       expect(task1.progressPercent).toBe(0)
       expect(task1.eligibleForProgressTracking).toBe(true)
-      expect(task1.metadata.priority).toBe('medium')
-      expect(task1.metadata.difficulty).toBe(1)
+      expect(task1.metadata.badge).toBeNull()
+      expect(task1.metadata.completionBonusPoints).toBe(0)
       expect(task1.estimatedPoints).toBe(13)
       expect(task1.isCompleted).toBe(false)
 
@@ -329,7 +330,7 @@ describe('Milestone 7 — task list and metadata API', () => {
     }
   })
 
-  runIfDatabaseConfigured('GET /api/tasks sorts by difficulty asc', async () => {
+  runIfDatabaseConfigured('GET /api/tasks sorts by estimatedPoints asc', async () => {
     const db = getDb()
     const [user] = await db.insert(users).values({
       email: 'tasks-sort@example.com',
@@ -341,16 +342,16 @@ describe('Milestone 7 — task list and metadata API', () => {
 
       const mappings = await itemMappingsRepository.upsertMany(user.id, [
         { todoistItemId: 'task-hard', itemType: 'task', title: 'Hard Task' },
-        { todoistItemId: 'task-easy', itemType: 'task', title: 'Easy Task' }
+        { todoistItemId: 'task-easy', itemType: 'task', title: 'Easy Task' },
+        { todoistItemId: 'sub-hard', itemType: 'subtask', title: 'Hard Subtask', parentTodoistItemId: 'task-hard', projectTodoistId: null },
+        { todoistItemId: 'sub-easy', itemType: 'subtask', title: 'Easy Subtask', parentTodoistItemId: 'task-easy', projectTodoistId: null }
       ])
 
-      const hardMapping = mappings.find(m => m.todoistItemId === 'task-hard')!
-      const easyMapping = mappings.find(m => m.todoistItemId === 'task-easy')!
+      const hardSubMapping = mappings.find(m => m.todoistItemId === 'sub-hard')!
+      const easySubMapping = mappings.find(m => m.todoistItemId === 'sub-easy')!
 
-      await db.insert(taskMetadata).values([
-        { userId: user.id, todoistItemMappingId: hardMapping.id, priority: 'high', difficulty: 8, completionBonusEnabled: true, completionBonusPercent: '10.00' },
-        { userId: user.id, todoistItemMappingId: easyMapping.id, priority: 'low', difficulty: 2, completionBonusEnabled: true, completionBonusPercent: '10.00' }
-      ])
+      await tasksRepository.upsertSubtaskMetadata(user.id, hardSubMapping.id, { priority: 'high', difficulty: 8, timeEstimateMinutes: null })
+      await tasksRepository.upsertSubtaskMetadata(user.id, easySubMapping.id, { priority: 'low', difficulty: 2, timeEstimateMinutes: null })
 
       const sessionRes = await fetch(`${baseUrl}/api/internal/test-auth/session`, {
         method: 'POST',
@@ -359,7 +360,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       })
       const sessionCookie = sessionRes.headers.get('set-cookie')?.split(';')[0] ?? ''
 
-      const res = await fetch(`${baseUrl}/api/tasks?sortBy=difficulty&sortOrder=asc`, {
+      const res = await fetch(`${baseUrl}/api/tasks?sortBy=estimatedPoints&sortOrder=asc`, {
         headers: authHeader(sessionCookie)
       })
       const payload = await res.json()
@@ -503,46 +504,35 @@ describe('Milestone 7 — task list and metadata API', () => {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', ...authHeader(sessionCookie) },
         body: JSON.stringify({
-          priority: 'high',
-          difficulty: 7,
-          timeEstimateMinutes: 60,
-          completionBonusEnabled: true,
-          completionBonusPercent: 15,
           badge: 'Deep Work',
-          customPointOverride: null
+          completionBonusPoints: 10
         })
       })
       const patchPayload = await patchRes.json()
 
       expect(patchRes.status).toBe(200)
-      expect(patchPayload.data.metadata.priority).toBe('high')
-      expect(patchPayload.data.metadata.difficulty).toBe(7)
       expect(patchPayload.data.metadata.badge).toBe('Deep Work')
+      expect(patchPayload.data.metadata.completionBonusPoints).toBe(10)
 
       const patchRes2 = await fetch(`${baseUrl}/api/tasks/${mapping!.id}/metadata`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', ...authHeader(sessionCookie) },
         body: JSON.stringify({
-          priority: 'low',
-          difficulty: 3,
-          timeEstimateMinutes: null,
-          completionBonusEnabled: false,
-          completionBonusPercent: 0,
           badge: null,
-          customPointOverride: 50
+          completionBonusPoints: 0
         })
       })
       const patchPayload2 = await patchRes2.json()
 
       expect(patchRes2.status).toBe(200)
-      expect(patchPayload2.data.metadata.priority).toBe('low')
-      expect(patchPayload2.data.metadata.customPointOverride).toBe(50)
+      expect(patchPayload2.data.metadata.badge).toBeNull()
+      expect(patchPayload2.data.metadata.completionBonusPoints).toBe(0)
 
       const detailRes = await fetch(`${baseUrl}/api/tasks/${mapping!.id}`, {
         headers: authHeader(sessionCookie)
       })
       const detail = await detailRes.json()
-      expect(detail.data.estimatedPoints).toBe(50)
+      expect(detail.data.estimatedPoints).toBe(0)
     } finally {
       await db.delete(users).where(eq(users.id, user.id))
     }
@@ -572,7 +562,7 @@ describe('Milestone 7 — task list and metadata API', () => {
       const res = await fetch(`${baseUrl}/api/tasks/${mapping!.id}/metadata`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', ...authHeader(sessionCookie) },
-        body: JSON.stringify({ priority: 'invalid', difficulty: 99 })
+        body: JSON.stringify({ completionBonusPoints: -1 })
       })
       expect(res.status).toBe(422)
     } finally {
@@ -608,13 +598,8 @@ describe('Milestone 7 — task list and metadata API', () => {
         body: JSON.stringify({
           items: mappings.map(m => ({
             taskId: m.id,
-            priority: 'medium',
-            difficulty: 5,
-            timeEstimateMinutes: null,
-            completionBonusEnabled: true,
-            completionBonusPercent: 10,
-            badge: null,
-            customPointOverride: null
+            badge: 'Focus',
+            completionBonusPoints: 5
           }))
         })
       })

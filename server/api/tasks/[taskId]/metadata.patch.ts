@@ -1,6 +1,6 @@
 import { getRouterParam } from 'h3'
 
-import { taskMetadataSchema } from '../../../../shared/schemas'
+import { taskGroupMetadataSchema } from '../../../../shared/schemas'
 import { defineApiHandler, notFoundError, success, tooManyRequestsError } from '../../../utils/api'
 import { checkRateLimit, createRateLimiter } from '../../../utils/rate-limit'
 import { requireCurrentUser } from '../../../utils/session'
@@ -29,28 +29,18 @@ export default defineApiHandler(async (event) => {
     throw notFoundError('Task not found')
   }
 
-  const body = await parseBodyWithSchema(event, taskMetadataSchema)
+  const body = await parseBodyWithSchema(event, taskGroupMetadataSchema)
 
-  await tasksRepository.upsertTaskMetadata(user.id, taskId, {
-    priority: body.priority,
-    difficulty: body.difficulty,
-    timeEstimateMinutes: body.timeEstimateMinutes,
-    completionBonusEnabled: body.completionBonusEnabled,
-    completionBonusPercent: body.completionBonusPercent,
+  await tasksRepository.upsertTaskGroupMetadata(user.id, taskId, {
     badge: body.badge,
-    customPointOverride: body.customPointOverride
+    completionBonusPoints: body.completionBonusPoints
   })
 
   return success({
     taskId,
     metadata: {
-      priority: body.priority,
-      difficulty: body.difficulty,
-      timeEstimateMinutes: body.timeEstimateMinutes,
-      completionBonusEnabled: body.completionBonusEnabled,
-      completionBonusPercent: body.completionBonusPercent,
       badge: body.badge,
-      customPointOverride: body.customPointOverride
+      completionBonusPoints: body.completionBonusPoints
     }
   })
 })

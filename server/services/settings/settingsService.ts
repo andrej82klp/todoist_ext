@@ -28,7 +28,6 @@ function mapSettingsRowToResponse(
   row: GlobalSettings,
   milestoneRows: Awaited<ReturnType<typeof settingsRepository.findMilestonesByUserId>>
 ): GlobalSettingsResponse {
-  const completionPercent = numericToNumber(row.completionBonusPercent)
   const sortedMilestones = [...milestoneRows]
     .sort((a, b) => a.days - b.days)
     .map(mapMilestoneRow)
@@ -40,9 +39,7 @@ function mapSettingsRowToResponse(
         low: numericToNumber(row.lowPriorityMultiplier),
         medium: numericToNumber(row.mediumPriorityMultiplier),
         high: numericToNumber(row.highPriorityMultiplier)
-      },
-      defaultCompletionBonusEnabled: completionPercent > 0,
-      defaultCompletionBonusPercent: completionPercent
+      }
     },
     streak: {
       ruleType: row.streakRuleType,
@@ -88,12 +85,6 @@ export const settingsService = {
         if (pm.low !== undefined) flat.lowPriorityMultiplier = String(pm.low)
         if (pm.medium !== undefined) flat.mediumPriorityMultiplier = String(pm.medium)
         if (pm.high !== undefined) flat.highPriorityMultiplier = String(pm.high)
-      }
-      if (p.defaultCompletionBonusEnabled === false) {
-        flat.completionBonusPercent = '0.00'
-      }
-      if (p.defaultCompletionBonusPercent !== undefined && p.defaultCompletionBonusEnabled !== false) {
-        flat.completionBonusPercent = String(p.defaultCompletionBonusPercent)
       }
     }
 

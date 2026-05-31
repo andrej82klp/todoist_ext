@@ -104,8 +104,7 @@ describe('Milestone 3 shared contract endpoints', () => {
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        difficulty: 11,
-        completionBonusPercent: -1
+        difficulty: 11
       })
     })
     const payload = await response.json()
@@ -114,7 +113,6 @@ describe('Milestone 3 shared contract endpoints', () => {
     expect(payload.error.code).toBe('VALIDATION_ERROR')
     expect(payload.error.message).toBe(API_ERROR_MESSAGE.VALIDATION_ERROR)
     expect(payload.error.details.fields.difficulty).toContain('Too big: expected number to be <=10')
-    expect(payload.error.details.fields.completionBonusPercent).toContain('Too small: expected number to be >=0')
   })
 })
 
@@ -128,6 +126,6 @@ describe('Milestone 3 error normalization helpers', () => {
   })
 
   it('keeps the sorting allowlist explicit and shared', () => {
-    expect(TASK_SORT_FIELDS).toEqual(['task', 'priority', 'difficulty', 'estimatedPoints', 'deadline'])
+    expect(TASK_SORT_FIELDS).toEqual(['task', 'estimatedPoints', 'deadline'])
   })
 })

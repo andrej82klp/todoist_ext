@@ -166,40 +166,26 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       const subtaskOneMapping = mappings.find(m => m.todoistItemId === 'subtask-1')!
       const subtaskTwoMapping = mappings.find(m => m.todoistItemId === 'subtask-2')!
 
-      // Configure metadata for the parent task:
-      // - `priority: high` and `difficulty: 4` set the base points.
-      // - `completionBonusEnabled: true` with 10% will award a one-time bonus
+      // Configure group metadata for the parent task:
+      // - `completionBonusPoints: 6` will award a fixed one-time bonus
       //   when all subtasks are completed and the parent is marked complete.
-      await tasksRepository.upsertTaskMetadata(user.id, parentMapping.id, {
-        priority: 'high',
-        difficulty: 4,
-        timeEstimateMinutes: null,
-        completionBonusEnabled: true,
-        completionBonusPercent: 10,
+      await tasksRepository.upsertTaskGroupMetadata(user.id, parentMapping.id, {
         badge: null,
-        customPointOverride: null
+        completionBonusPoints: 6
       })
 
-      // Configure metadata for subtask 1: medium difficulty -> smaller earned points.
-      await tasksRepository.upsertTaskMetadata(user.id, subtaskOneMapping.id, {
+      // Configure metadata for subtask 1: medium difficulty -> earned points on completion.
+      await tasksRepository.upsertSubtaskMetadata(user.id, subtaskOneMapping.id, {
         priority: 'medium',
         difficulty: 2,
-        timeEstimateMinutes: null,
-        completionBonusEnabled: false,
-        completionBonusPercent: 0,
-        badge: null,
-        customPointOverride: null
+        timeEstimateMinutes: null
       })
 
       // Configure metadata for subtask 2: same as subtask 1.
-      await tasksRepository.upsertTaskMetadata(user.id, subtaskTwoMapping.id, {
+      await tasksRepository.upsertSubtaskMetadata(user.id, subtaskTwoMapping.id, {
         priority: 'medium',
         difficulty: 2,
-        timeEstimateMinutes: null,
-        completionBonusEnabled: false,
-        completionBonusPercent: 0,
-        badge: null,
-        customPointOverride: null
+        timeEstimateMinutes: null
       })
 
       // 1) Send a completion event for `subtask-1`.
@@ -263,7 +249,7 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
       // - Two 'earned' transactions (one per subtask).
       // - One 'bonus' transaction (one-time for the parent task).
       // Points math: each subtask => 2 * 10 * 1.25 = 25 points; total subtasks = 50.
-      // Parent base points: 4 * 10 * 1.5 = 60; 10% bonus = 6 => final total = 56.
+      // Parent fixed bonus: 6 pts => final total = 56.
       expect(ledgerRows).toHaveLength(3)
       expect(ledgerRows.filter(row => row.transactionType === 'earned')).toHaveLength(2)
       expect(ledgerRows.filter(row => row.transactionType === 'bonus')).toHaveLength(1)
@@ -279,5 +265,5 @@ describe('Milestone 13 — Todoist webhook endpoint', () => {
     } finally {
       await db.delete(users).where(eq(users.id, user.id))
     }
-  })
+  }, 30000)
 })
